@@ -34,6 +34,9 @@ add_executable(xp_test_math tests/xp_test_math.c)
 target_link_libraries(xp_test_math PRIVATE xphysics)
 target_include_directories(xp_test_math PRIVATE src) # we allow unit tests to access our internal src folder
 
+add_executable(xp_test_main tests/xp_test_main.c)
+target_link_libraries(xp_test_main PRIVATE xphysics)
+
 # todo: in the future it could be interesting to avoid using libc/msvcrt altogether for maximum portability,
 # but I am not sure how much that is feasible so we just do the default thing for now
 

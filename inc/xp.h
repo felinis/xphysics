@@ -51,7 +51,29 @@ typedef f32 real;
 #endif
 
 typedef void* xp_context;
+typedef void* xp_shape;
+typedef void* xp_rigid_body;
 
-XP_API xp_context xp_init(void* mem, usize size);
+// MAIN API
+typedef struct
+{
+	void* persistent_memory; // memory block that will be used for persistent data (e.g. convex hulls, rigid bodies)
+	usize persistent_memory_size;
+	void* transient_memory; // memory block that will be used for transient data (e.g. solving contacts)
+	usize transient_memory_size;
+	
+	usize max_convex_hulls;
+	usize max_rigid_bodies;
+} xp_context_create_info;
+XP_API xp_context xp_init(const xp_context_create_info* info);
 XP_API void xp_shutdown(xp_context context);
 XP_API void xp_update(xp_context context, real dt);
+
+// SHAPE API
+XP_API xp_shape xp_create_convex_hull_shape(xp_context context, real* vertex_positions, usize vertex_count);
+XP_API void xp_destroy_shape(xp_context context, xp_shape shape);
+
+// RIGID BODY API
+XP_API xp_rigid_body xp_create_rigid_body(xp_context context, xp_shape shape);
+XP_API void xp_destroy_rigid_body(xp_context context, xp_rigid_body body);
+
