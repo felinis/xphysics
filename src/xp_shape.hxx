@@ -1,5 +1,5 @@
 #pragma once
-#include "xp_math.h"
+#include "xp_math.hxx"
 
 struct xp_shape_internal
 {
