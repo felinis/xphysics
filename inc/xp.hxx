@@ -9,6 +9,12 @@
 #error "Unsupported architecture"
 #endif
 
+#ifndef NDEBUG
+#define XP_BREAK(x) { volatile int *p = 0; *p = 0; } // debugger break
+#else
+#define XP_BREAK(x)
+#endif
+
 #if defined(_WIN32) || defined(__CYGWIN__)
 	#if XP_EXPORT
 		#define XP_API __declspec(dllexport)
@@ -27,63 +33,57 @@
 // feel free to change the following macros to match your needs
 #define XP_USE_DOUBLE_PRECISION 1
 
-namespace xp
+// type definitions
+typedef char s8;
+typedef unsigned char u8;
+typedef short s16;
+typedef unsigned short u16;
+typedef int s32;
+typedef unsigned int u32;
+typedef long long s64;
+typedef unsigned long long u64;
+
+// we define usize and ssize depending on the architecture bitness
+#if XP_ARCH_BITNESS_64
+typedef u64 usize;
+typedef s64 ssize;
+#elif XP_ARCH_BITNESS_32
+typedef u32 usize;
+typedef s32 ssize;
+#endif
+typedef usize id;
+
+typedef float f32;
+typedef double f64;
+
+#if XP_USE_DOUBLE_PRECISION
+typedef f64 real;
+#else
+typedef f32 real;
+#endif
+
+typedef real kilogram;
+typedef real second;
+
+typedef struct
 {
-	// type definitions
-	typedef char s8;
-	typedef unsigned char u8;
-	typedef short s16;
-	typedef unsigned short u16;
-	typedef int s32;
-	typedef unsigned int u32;
-	typedef u32 id;
-	typedef long long s64;
-	typedef unsigned long long u64;
+	u8* persistent_memory;
+	usize persistent_size;
 
-	// we define usize and ssize depending on the architecture bitness
-	#if XP_ARCH_BITNESS_64
-	typedef u64 usize;
-	typedef s64 ssize;
-	#elif XP_ARCH_BITNESS_32
-	typedef u32 usize;
-	typedef s32 ssize;
-	#endif
+	u8* transient_memory;
+	usize transient_size;
+} memory_provider;
 
-	typedef float f32;
-	typedef double f64;
+constexpr id INVALID_ID = (id)-1;
 
-	#if XP_USE_DOUBLE_PRECISION
-	typedef f64 real;
-	#else
-	typedef f32 real;
-	#endif
-
-	typedef real kilogram;
-	typedef real second;
-
-	struct memory_provider
-	{
-		u8* persistent_memory;
-		usize persistent_size;
-
-		u8* transient_memory;
-		usize transient_size;
-	};
-
-	struct instance
-	{
-		virtual void step(second dt) = 0;
-
-		virtual id create_fixed_body() = 0;
-		virtual id create_dynamic_body(kilogram mass) = 0; // todo: inertia type enum?
-		virtual void destroy_body(id body_id) = 0;
-
-		virtual id create_convex_shape(const real* vertex_positions, u32 vertex_count) = 0;
-		virtual void attach_shape(id body_id, id shape_id) = 0;
-
-		virtual void get_body_position(id body_id, real out_position[3]) const = 0;
-		virtual void set_body_position(id body_id, const real position[3]) = 0;
-	};
-}
-
-XP_EXTERN_C XP_API xp::instance* xp_create_instance(const xp::memory_provider& provider);
+XP_EXTERN_C XP_API usize xp_get_memory_requirements(u32 num_convex_hull_verts, u32 num_contacts, u32 num_bodies);
+XP_EXTERN_C XP_API bool xp_init(const memory_provider* provider, u32 convex_hulls_verts_budget, u32 bodies_budget);
+XP_EXTERN_C XP_API void xp_uninit();
+XP_EXTERN_C XP_API void xp_step(second dt);
+XP_EXTERN_C XP_API id xp_create_fixed_body();
+XP_EXTERN_C XP_API id xp_create_dynamic_body(kilogram mass); // todo: inertia type enum?
+XP_EXTERN_C XP_API void xp_destroy_body(id body_id);
+XP_EXTERN_C XP_API id xp_create_convex_hull(const real* vertex_positions, u32 vertex_count);
+XP_EXTERN_C XP_API void xp_attach_shape(id body_id, id shape_id);
+XP_EXTERN_C XP_API void xp_get_body_position(id body_id, real out_position[3]);
+XP_EXTERN_C XP_API void xp_set_body_position(id body_id, const real position[3]);

@@ -1,5 +1,4 @@
 #include "../src/xp_math.hxx"
-using namespace xp;
 
 int main()
 {

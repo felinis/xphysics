@@ -3,19 +3,23 @@
 
 int main()
 {
-	xp::memory_provider provider;
-	provider.persistent_memory = reinterpret_cast<xp::u8*>(malloc(sizeof(void*) * 1024 * 1024));
-	provider.persistent_size = sizeof(void*) * 1024 * 1024;
-	provider.transient_memory = reinterpret_cast<xp::u8*>(malloc(sizeof(void*) * 128 * 1024));
-	provider.transient_size = sizeof(void*) * 128 * 1024;
+	const usize required_mem_size = xp_get_memory_requirements(1024, 1024, 1024);
 
-	xp::instance* instance = xp_create_instance(provider);
-	instance->step(1.0 / 60.0);
+	u8* mem = reinterpret_cast<u8*>(malloc(1024 * 1024 * 8)); // todo: replace with required_mem_size
 
-	instance->destroy_body(instance->create_dynamic_body(1.0));
+	memory_provider mp;
+	mp.persistent_memory = mem;
+	mp.persistent_size = 1024 * 1024 * 6;
+	mp.transient_memory = mem + (1024 * 1024 * 6);
+	mp.transient_size = 1024 * 1024 * 2;
 
-	free(provider.persistent_memory);
-	free(provider.transient_memory);
+	if (xp_init(&mp, 64, 128))
+	{
+		xp_step(1.0 / 60.0);
+		xp_destroy_body(xp_create_dynamic_body(10.0));
+	}
+
+	free(mem);
 
 	return 0;
 }

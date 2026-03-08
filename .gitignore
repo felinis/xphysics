@@ -48,3 +48,6 @@ user/
 # CMake build folders
 build/
 out/
+
+# Visual Studio
+.vs/

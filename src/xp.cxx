@@ -4,101 +4,150 @@
 //
 
 #include "xp.hxx"
-#include <new>
 
-namespace xp
+template <typename T>
+struct linear_allocator
 {
-	template <typename T>
-	class linear_allocator
+	T* memory;
+	usize size;
+	usize offset;
+
+	linear_allocator() : memory(nullptr), size(0), offset(0) {}
+	linear_allocator(T* memory, usize size) : memory(memory), size(size), offset(0) {}
+
+	void* push_bytes(usize count)
 	{
-		T* memory;
-		usize size;
-		usize offset;
+		if (offset + count > size)
+			return nullptr;
 
-	public:
-		linear_allocator() : memory(nullptr), size(0), offset(0) {}
-		linear_allocator(T* memory, usize size) : memory(memory), size(size), offset(0) {}
+		void* result = reinterpret_cast<u8*>(memory) + offset;
+		offset += count;
+		return result;
+	}
 
-		T* allocate(usize count)
-		{
-			if (offset + count > size)
-				return nullptr;
+	void reset() { offset = 0; }
 
-			T* result = memory + offset;
-			offset += count;
-			return result;
-		}
+	T& operator[](usize i) { return memory[i]; }
+	const T& operator[](usize i) const { return memory[i]; }
+};
+static linear_allocator<u8> persistent_arena;
+static linear_allocator<u8> transient_arena;
 
-		void deallocate(T* memory, usize count) {}
+template <typename T>
+struct memory_range
+{
+	T* begin;
+	T* end;
+};
 
-		void reset() { offset = 0; }
-	};
+struct xp_contact_manifold
+{
+	real pos[3];
+	real penetration_depth;
+};
+static linear_allocator<xp_contact_manifold> contact_manifolds;
 
-	struct memory_context
-	{
-		linear_allocator<u8> persistent_allocator;
-		linear_allocator<u8> transient_allocator;
-	};
+struct xp_convex_hull
+{
+	memory_range<real> verts; // in convex_hulls_verts
 
-	class instance_impl final : public instance
-	{
-		memory_context memctx;
+};
+static linear_allocator<xp_convex_hull> convex_hulls;
 
-	public:
-		instance_impl(const memory_context& memctx) : memctx(memctx) {}
+struct xp_hull_vert
+{
+	real pos[3];
+};
+static linear_allocator<real> convex_hulls_verts;
 
-		virtual void step(second dt) override
-		{
-			
-		}
+struct xp_body
+{
+	real position[3];
+};
+static linear_allocator<xp_body> bodies;
 
-		virtual id create_fixed_body() override
-		{
-			return 0;
-		}
-
-		virtual id create_dynamic_body(kilogram mass) override
-		{
-			return 0;
-		}
-
-		virtual void destroy_body(id body_id) override
-		{
-			
-		}
-
-		virtual id create_convex_shape(const real* vertex_positions, u32 vertex_count) override
-		{
-			return 0;
-		}
-
-		virtual void attach_shape(id body_id, id shape_id) override
-		{
-			
-		}
-
-		virtual void get_body_position(id body_id, real out_position[3]) const override
-		{
-			
-		}
-
-		virtual void set_body_position(id body_id, const real position[3]) override
-		{
-			
-		}
-	};
+usize xp_get_memory_requirements(u32 num_convex_hull_verts, u32 num_contacts, u32 num_bodies)
+{
+	return sizeof(real) * num_convex_hull_verts +
+		sizeof(xp_contact_manifold) * num_contacts +
+		sizeof(xp_body) * num_bodies;
 }
 
-XP_EXTERN_C XP_API xp::instance* xp_create_instance(const xp::memory_provider& provider)
+bool xp_init(const memory_provider* mp, u32 convex_hulls_verts_budget, u32 bodies_budget)
 {
-	if (!provider.persistent_memory || !provider.transient_memory)
-		return nullptr;
+	// validate memory
+	if (!mp->persistent_memory || !mp->transient_memory)
+	{
+		XP_BREAK("Invalid memory pointers provided.");
+		return false;
+	}
+	persistent_arena = linear_allocator<u8>(mp->persistent_memory, mp->persistent_size);
+	transient_arena = linear_allocator<u8>(mp->transient_memory, mp->transient_size);
 
-	xp::memory_context memctx;
-	memctx.persistent_allocator = xp::linear_allocator<xp::u8>(provider.persistent_memory, provider.persistent_size);
-	memctx.transient_allocator = xp::linear_allocator<xp::u8>(provider.transient_memory, provider.transient_size);
+	// distribute the arena memory across various systems
+	const usize convex_hulls_verts_arena_size = sizeof(real) * convex_hulls_verts_budget;
+	convex_hulls_verts = linear_allocator<real>((real*)persistent_arena.push_bytes(convex_hulls_verts_arena_size), convex_hulls_verts_arena_size);
+	const usize bodies_arena_size = sizeof(real) * convex_hulls_verts_budget;
+	bodies = linear_allocator<xp_body>((xp_body*)persistent_arena.push_bytes(bodies_arena_size), bodies_arena_size);
 
-	// put this instance class in persistent memory and instantiate it
-	void* memory = memctx.persistent_allocator.allocate(sizeof(xp::instance_impl));
-	return new (memory) xp::instance_impl(memctx);
+	// todo: contact manifolds
+
+	return true;
+}
+
+void xp_uninit()
+{
+
+}
+
+void xp_step(second dt)
+{
+	// reset transient memory for the frame
+	transient_arena.reset();
+
+	// todo: collision detection using contact manifolds, AABB sweep and prune, quicksort
+
+	// integrate
+	// todo: semi-implicit euler
+}
+
+id xp_create_fixed_body()
+{
+	return INVALID_ID;
+}
+
+id xp_create_dynamic_body(kilogram mass)
+{
+	return INVALID_ID;
+}
+
+void xp_destroy_body(id body_id)
+{
+	
+}
+
+id xp_create_convex_hull(const real* vertex_positions, u32 vertex_count)
+{
+
+
+	return INVALID_ID;
+}
+
+void xp_attach_shape(id body_id, id shape_id)
+{
+	
+}
+
+void xp_get_body_position(id body_id, real out_position[3])
+{
+	out_position[0] = bodies[body_id].position[0];
+	out_position[1] = bodies[body_id].position[1];
+	out_position[2] = bodies[body_id].position[2];
+}
+
+void xp_set_body_position(id body_id, const real position[3])
+{
+	bodies[body_id].position[0] = position[0];
+	bodies[body_id].position[1] = position[1];
+	bodies[body_id].position[2] = position[2];
 }
