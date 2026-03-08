@@ -1,2 +1,3 @@
 -Iinc
 -DXP_EXPORT
+-D__AVX__

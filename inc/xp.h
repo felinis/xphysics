@@ -1,9 +1,5 @@
 #pragma once
 
-// xphysics configuration
-// feel free to change the following macros to match your needs
-#define XP_USE_DOUBLE_PRECISION 1
-
 // architecture bitness
 #if defined(__amd64__) || defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)
 #define XP_ARCH_BITNESS_64 1
@@ -20,6 +16,11 @@
 		#define XP_API __declspec(dllimport)
 	#endif
 #endif
+
+
+// xphysics configuration
+// feel free to change the following macros to match your needs
+#define XP_USE_DOUBLE_PRECISION 1
 
 // type definitions
 typedef char s8;
