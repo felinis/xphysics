@@ -5,11 +5,17 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SOURCES 
+	src/xp_broadphase.cxx
+	src/xp_narrowphase.cxx
 	src/xp.cxx
 )
 set(HEADERS
-	inc/xp.hxx
+	src/xp_broadphase.hxx
+	src/xp_internal.hxx
 	src/xp_math.hxx
+	src/xp_math_operators.hxx
+	src/xp_narrowphase.hxx
+	inc/xp.hxx
 )
 
 add_library(xphysics SHARED ${SOURCES} ${HEADERS})
