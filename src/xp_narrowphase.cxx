@@ -88,11 +88,132 @@ bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 	}
 	else if (simplex.count == 3) // the simplex is a triangle
 	{
-		// todo
+		const vreal4 b = simplex.points[1];
+		const vreal4 c = simplex.points[2];
+		const vreal4 ab = b - a;
+		const vreal4 ac = c - a;
+		const vreal4 a0 = -a;
+
+		// compute triangle normal
+		const vreal4 abc = vcross(ab, ac);
+
+		// vector perpendicular to ac, points out of the triangle
+		const vreal4 cross_abc_ac = vcross(abc, ac);
+
+		// vector perpendicular to ab, points out of the triangle
+		const vreal4 cross_ab_abc = vcross(ab, abc);
+
+		if (vdot(cross_abc_ac, a0) > 0.0)
+		{
+			if (vdot(ac, a0) > 0.0)
+			{
+				// origin is perpendicular to ac, so we discard b
+				simplex.points[1] = c; // simplex is now [a, c]
+				simplex.count = 2;
+				dir = vcross(vcross(ac, a0), ac);
+			}
+			else
+			{
+				// fallback to testing the ab region
+				if (vdot(ab, a0) > 0.0)
+				{
+					simplex.points[1] = b; // simplex is now [a, b]
+					simplex.count = 2;
+					dir = vcross(vcross(ab, a0), ab);
+				}
+				else
+				{
+					// origin is closest to vertex a, so we discard b and c
+					simplex.count = 1;
+					dir = a0;
+				}
+			}
+		}
+		else if (vdot(cross_ab_abc, a0) > 0.0)
+		{
+			// origin is outside edge ab
+			if (vdot(ab, a0) > 0.0)
+			{
+				simplex.points[1] = b; // simplex is now [a, b]
+				simplex.count = 2;
+				dir = vcross(vcross(ab, a0), ab);
+			}
+			else
+			{
+				simplex.count = 1;
+				dir = a0;
+			}
+		}
+		else
+		{
+			// origin is inside the triangular prism, not outside any edge
+			// we just need to check if it's above or below
+			if (vdot(abc, a0) > 0.0)
+			{
+				// origin is above the triangle in the directino of the normal
+				dir = abc;
+			}
+			else
+			{
+				// origin is below the triangle in the directino of the normal
+				dir = -abc;
+
+				// important: we must swap b and c to maintain proper winding order
+				// so the normal points correctly in the next iteration
+				simplex.points[1] = c;
+				simplex.points[2] = b;
+			}
+		}
+
+		return false; // a triangle cannot enclose a 3d volume
 	}
 	else if (simplex.count == 4) // the simplex is a tetrahedron
 	{
-		// todo
+		const vreal4 b = simplex.points[1];
+		const vreal4 c = simplex.points[2];
+		const vreal4 d = simplex.points[3];
+
+		const vreal4 ab = b - a;
+		const vreal4 ac = c - a;
+		const vreal4 ad = d - a;
+		const vreal4 a0 = -a;
+
+		// compute out facing normals for the 3 faces that share a
+		// important: winding order to make sure that normals point out of tetrahedron
+		const vreal4 abc = vcross(ab, ac);
+		const vreal4 acd = vcross(ac, ad);
+		const vreal4 adb = vcross(ad, ab);
+
+		// check if origin is outside face abc
+		if (vdot(abc, a0) > 0.0)
+		{
+			// origin is outside abc, we can discard d
+			simplex.count = 3;
+			dir = abc;
+			return false;
+		}
+		if (vdot(acd, a0) > 0.0)
+		{
+			// origin is outside acd, we can discard b
+			simplex.points[1] = c;
+			simplex.points[2] = d;
+			simplex.count = 3;
+			dir = acd;
+			return false;
+		}
+		if (vdot(adb, a0) > 0.0)
+		{
+			// origin is outside adb, we can discard c
+			simplex.points[1] = d;
+			simplex.points[2] = b;
+			simplex.count = 3;
+			dir = adb;
+			return false;
+		}
+
+		// if we get here, the origin is not outside abc, acd or adb, and
+		// since we already know it's not outside bcd, it has to be inside the tetrahedron
+		return true; // collision detected
 	}
 
 	return false;
