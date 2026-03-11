@@ -69,3 +69,34 @@ inline vreal4& operator/=(vreal4& a, const real b)
 	a = a / b;
 	return a;
 }
+
+// qreal + qreal
+inline qreal operator+(const qreal a, const qreal b)
+{
+	qreal result;
+	result.simd = _mm256_add_pd(a.simd, b.simd);
+	return result;
+}
+
+// qreal += qreal
+inline qreal& operator+=(qreal& a, const qreal b)
+{
+	a = a + b;
+	return a;
+}
+
+// qreal * scalar
+inline qreal operator*(const qreal a, const real b)
+{
+	qreal result;
+	result.simd = _mm256_mul_pd(a.simd, _mm256_set1_pd(b));
+	return result;
+}
+
+// scalar * qreal
+inline qreal operator*(const real a, const qreal b)
+{
+	qreal result;
+	result.simd = _mm256_mul_pd(_mm256_set1_pd(a), b.simd);
+	return result;
+}

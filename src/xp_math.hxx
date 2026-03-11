@@ -157,6 +157,18 @@ inline qreal qangles(real x, real y, real z)
 	return result;
 }
 
+// quaternion multipication
+inline qreal qmul(const qreal a, const qreal b)
+{
+	// todo: simd optimizations
+	qreal result;
+	result.r = a.r * b.r - a.i * b.i - a.j * b.j - a.k * b.k;
+	result.i = a.r * b.i + a.i * b.r + a.j * b.k - a.k * b.j;
+	result.j = a.r * b.j - a.i * b.k + a.j * b.r + a.k * b.i;
+	result.k = a.r * b.k + a.i * b.j - a.j * b.i + a.k * b.r;
+	return result;
+}
+
 typedef union
 {
 	real data[12];

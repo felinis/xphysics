@@ -32,7 +32,7 @@ inline bool aabb_compare_x(const xp_aabb& a, const xp_aabb& b)
 	return a.min[0] < b.min[0];
 }
 
-memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const position* body_positions, linear_allocator<u8>& transient_arena)
+memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, linear_allocator<u8>& transient_arena)
 {
 	// we need to allocate space for the aabbs in the transient arena
 	const usize aabb_arena_size = sizeof(xp_aabb) * active_body_count;
@@ -48,15 +48,15 @@ memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_c
 	// temporarily we calculate the aabbs in a dummy way
 	for (u32 i = 0; i < active_body_count; ++i)
 	{
-		const position& pos = body_positions[i];
+		const vreal4& pos = body_positions[i];
 		const real half_extents = 1.0; // just a dummy value for now
 		
-		aabbs[i].min[0] = quantize_coordinate(pos.coords[0] - half_extents);
-		aabbs[i].min[1] = quantize_coordinate(pos.coords[1] - half_extents);
-		aabbs[i].min[2] = quantize_coordinate(pos.coords[2] - half_extents);
-		aabbs[i].max[0] = quantize_coordinate(pos.coords[0] + half_extents);
-		aabbs[i].max[1] = quantize_coordinate(pos.coords[1] + half_extents);
-		aabbs[i].max[2] = quantize_coordinate(pos.coords[2] + half_extents);
+		aabbs[i].min[0] = quantize_coordinate(pos.data[0] - half_extents);
+		aabbs[i].min[1] = quantize_coordinate(pos.data[1] - half_extents);
+		aabbs[i].min[2] = quantize_coordinate(pos.data[2] - half_extents);
+		aabbs[i].max[0] = quantize_coordinate(pos.data[0] + half_extents);
+		aabbs[i].max[1] = quantize_coordinate(pos.data[1] + half_extents);
+		aabbs[i].max[2] = quantize_coordinate(pos.data[2] + half_extents);
 		aabbs[i].body_id = i;
 	}
 

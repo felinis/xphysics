@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES 
 	src/xp_broadphase.cxx
 	src/xp_narrowphase.cxx
+	src/xp_solver.cxx
 	src/xp.cxx
 )
 set(HEADERS
@@ -15,6 +16,7 @@ set(HEADERS
 	src/xp_math.hxx
 	src/xp_math_operators.hxx
 	src/xp_narrowphase.hxx
+	src/xp_solver.hxx
 	inc/xp.hxx
 )
 

@@ -1,6 +1,12 @@
 #pragma once
 #include "xp.hxx"
 
+struct xp_convex_hull
+{
+	usize nverts;
+	real* verts; // interleaved xyz positions
+};
+
 template <typename T>
 struct linear_allocator
 {
@@ -32,9 +38,8 @@ struct memory_range
 {
 	T* begin;
 	T* end;
-};
 
-struct position
-{
-	real coords[3];
+	usize size() const { return end - begin; }
+	T& operator[](usize i) { return begin[i]; }
+	const T& operator[](usize i) const { return begin[i]; }
 };

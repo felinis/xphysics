@@ -4,14 +4,7 @@
 //
 
 #include "xp_narrowphase.hxx"
-#include "xp_math.hxx"
 #include "xp_math_operators.hxx"
-
-struct xp_convex_hull
-{
-	usize nverts;
-	real* verts; // all vertex positions
-};
 
 // support mapping function: finds the furthest vertex of the convex hull in a given direction 
 inline vreal4 xp_get_convex_hull_support(const xp_convex_hull& hull, const vreal4& dir)
@@ -43,22 +36,6 @@ inline vreal4 xp_get_minkowski_support(const xp_convex_hull& hull_a, const xp_co
 	return furthest_vert_of_a - furthest_vert_of_b;
 }
 
-// defines a gjk shape
-struct xp_simplex
-{
-	vreal4 points[4]; // these can form a point, line, triangle or tetrahedron
-	u8 count;
-
-	void push(vreal4 point)
-	{
-		// shift points to make room
-		points[3] = points[2];
-		points[2] = points[1];
-		points[1] = points[0];
-		points[0] = point;
-		count = (count < 4) ? count + 1 : 4;
-	}
-};
 
 bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 {
@@ -219,12 +196,11 @@ bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 	return false;
 }
 
-bool xp_gjk_intersect(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b)
+bool xp_gjk_intersect(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b, xp_simplex& simplex)
 {
 	vreal4 search_direction = { 1.0, 0.0, 0.0, 0.0 }; // todo: cache and get the one from previous frame so we have O(1)
 
 	// get the first point on the minkowski difference
-	xp_simplex simplex;
 	simplex.count = 0;
 	simplex.push(xp_get_minkowski_support(hull_a, hull_b, search_direction));
 
@@ -248,4 +224,161 @@ bool xp_gjk_intersect(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b
 	}
 
 	return false;
+}
+
+// represents a single triangular face on the epa polytope
+struct xp_epa_face
+{
+	vreal4 a, b, c;
+	vreal4 normal;
+	real distance;
+};
+
+// computes a face's normal and distance from the origin
+inline void xp_compute_face_info(xp_epa_face& face)
+{
+	const vreal4 ab = face.b - face.a;
+	const vreal4 ac = face.c - face.a;
+	face.normal = vnormalize(vcross(ab, ac)); // important: winding order
+	face.distance = vdot(face.normal, face.a);
+}
+
+struct xp_epa_edge
+{
+	vreal4 a, b;
+};
+
+inline bool xp_vequals(const vreal4& a, const vreal4& b)
+{
+	const vreal4 diff = a - b;
+	return vdot(diff, diff) < 0.00001;
+}
+
+// add an edge to the silhouette list
+inline void xp_add_epa_edge(xp_epa_edge* edges, u32& nedges, const vreal4& a, const vreal4& b)
+{
+	// check if edge already exists
+	for (u32 i = 0; i < nedges; ++i)
+	{
+		// if the reverse edge exists, we have found a pair of faces that share this edge,
+		// thus it is an internal edge, not part of the outer silhouette
+		if (xp_vequals(edges[i].a, b) && xp_vequals(edges[i].b, a))
+		{
+			// remove the existing edge by swapping with the last element
+			edges[i] = edges[nedges - 1];
+			nedges--;
+			return;
+		}
+	}
+	
+	// otherwise it's a new edge, add it to the silhouette
+	edges[nedges++] = { a, b };
+}
+
+bool xp_epa_expand(
+	const xp_convex_hull& hull_a,
+	const xp_convex_hull& hull_b,
+	xp_simplex& simplex,
+	vreal4& normal,
+	real& penetration_depth
+)
+{
+	// initialize the polytope with the 4 faces of the GJK tetrahedron
+	const vreal4 a = simplex.points[0];
+	const vreal4 b = simplex.points[1];
+	const vreal4 c = simplex.points[2];
+	const vreal4 d = simplex.points[3];
+
+	// allocate a flat array for out polytope faces from the transient arena
+	const u32 MAX_FACES = 64;
+	xp_epa_face faces[MAX_FACES];
+	u32 nfaces = 0;
+
+	// note: winding order must ensure that normals are pointing out
+	faces[0] = { a, b, c };
+	xp_compute_face_info(faces[0]);
+	faces[1] = { a, c, d };
+	xp_compute_face_info(faces[1]);
+	faces[2] = { a, d, b };
+	xp_compute_face_info(faces[2]);
+	faces[3] = { b, c, d };
+	xp_compute_face_info(faces[3]);
+	nfaces = 4;
+
+	// main epa iteration loop
+	const u32 MAX_EPA_ITERATIONS = 32; // we need this to prevent infinite loops
+	for (u32 i = 0; i < MAX_EPA_ITERATIONS; ++i)
+	{
+		// find the face closest to the origin
+		u32 min_face_index = 0;
+		real min_distance = faces[0].distance;
+		for (u32 j = 1; j < nfaces; ++j)
+		{
+			if (faces[j].distance < min_distance)
+			{
+				min_distance = faces[j].distance;
+				min_face_index = j;
+			}
+		}
+
+		xp_epa_face closest_face = faces[min_face_index];
+
+		// find a new point in the direction of the normal
+		const vreal4 support_point = xp_get_minkowski_support(hull_a, hull_b, closest_face.normal);
+		const real support_dist = vdot(closest_face.normal, support_point);
+
+		// tolerance check: if the support point is not significantly further than the face,
+		// we have found the bounds of the minkowski difference
+		const real EPA_TOLERANCE = 0.0001;
+		if (support_dist - min_distance < EPA_TOLERANCE)
+		{
+			normal = closest_face.normal;
+			penetration_depth = support_dist;
+			return true; // collision detected
+		}
+
+		// expand the polytope
+		xp_epa_edge silhouette[MAX_FACES * 3];
+		u32 nedges = 0;
+
+		// find all faces visible from the new support point and extract their edges
+		for (u32 j = 0; j < nfaces; )
+		{
+			// a face is visible if it points towards the new support point
+			if (vdot(faces[j].normal, support_point) > faces[j].distance + 0.0001)
+			{
+				// add the edges to the silhouette
+				// important: winding order matters
+				xp_add_epa_edge(silhouette, nedges, faces[j].a, faces[j].b);
+				xp_add_epa_edge(silhouette, nedges, faces[j].b, faces[j].c);
+				xp_add_epa_edge(silhouette, nedges, faces[j].c, faces[j].a);
+
+				// delete the visible face by swapping it with the last face
+				faces[j] = faces[nfaces - 1];
+				nfaces--;
+			}
+			else
+				j++; // face is not visible, move to the next one
+		}
+
+		// if we exceed out max face budget, break out and use the best normal we have
+		if (nfaces + nedges >= MAX_FACES)
+			break;
+
+		// stitch new faces from the silhouette edges to the new support point
+		for (u32 j = 0; j < nedges; ++j)
+		{
+			faces[nfaces].a = silhouette[j].a;
+			faces[nfaces].b = silhouette[j].b;
+			faces[nfaces].c = support_point; // the new peak of the tent
+			xp_compute_face_info(faces[nfaces]);
+			nfaces++;
+		}
+	}
+
+	// as a fallback, use the last best face
+	normal = faces[0].normal;
+	penetration_depth = faces[0].distance;
+
+	return true; // collision detected
 }
