@@ -6,7 +6,7 @@ struct xp_contact_manifold
 {
 	id body_a, body_b;
 	real penetration_depth;
-//	real accumulated_impulse; // todo: warm start the solver
+	real accumulated_impulse; // for warm starting the solver
 	vreal4 pos;
 	vreal4 normal; // from b to a
 };
