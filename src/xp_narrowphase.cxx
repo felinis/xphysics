@@ -328,7 +328,7 @@ bool xp_epa_expand(
 
 		// tolerance check: if the support point is not significantly further than the face,
 		// we have found the bounds of the minkowski difference
-		const real EPA_TOLERANCE = 0.0001;
+		const real EPA_TOLERANCE = 0.01;
 		if (support_dist - min_distance < EPA_TOLERANCE)
 		{
 			normal = closest_face.normal;

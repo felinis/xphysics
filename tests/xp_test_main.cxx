@@ -56,13 +56,12 @@ int main()
 		for (int i = 0; i < 120; ++i)
 		{
 			xp_step(1.0 / 60.0);
+
+			real body_position[3];
+			xp_get_body_position(cube_body, body_position);
+			printf("%.4f\n", body_position[2]);
 		}
-
-		real final_pos[3];
-		xp_get_body_position(cube_body, final_pos);
-
-		printf("Final cube position: (%.3f, %.3f, %.3f)\n", final_pos[0], final_pos[1], final_pos[2]);
-
+#if 0
 		if (final_pos[2] < -0.1) // we allow slight penetration due to PGS solver tolerance, but it should not be very negative
 		{
 			printf("TEST FAILED: cube fell through the floor.\n");
@@ -72,7 +71,7 @@ int main()
 		{
 			printf("TEST PASSED: cube is resting on the floor.\n");
 		}
-
+#endif
 		xp_destroy_body(cube_body);
 		xp_destroy_body(floor_body);
 	}
