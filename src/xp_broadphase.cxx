@@ -6,14 +6,6 @@ constexpr real WORLD_MIN = -1000.0;
 constexpr real WORLD_MAX = 1000.0;
 constexpr real WORLD_EXTENT = WORLD_MAX - WORLD_MIN;
 
-// 16-bit quantized AABB
-struct xp_aabb
-{
-	u16 min[3];
-	u16 max[3];
-	id body_id;
-};
-
 // helper function to quantize a floating-point value
 inline u16 quantize_coordinate(real value)
 {

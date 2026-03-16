@@ -2,6 +2,14 @@
 #include "xp_internal.hxx"
 #include "xp_math.hxx"
 
+// 16-bit quantized AABB
+struct xp_aabb
+{
+	u16 min[3];
+	u16 max[3];
+	id body_id;
+};
+
 // represents a potential collision pair found by the broadphase
 struct xp_broadphase_pair
 {

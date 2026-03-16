@@ -31,15 +31,21 @@ static u32 convex_hull_count = 0;
 // maps body id -> convex hull id
 static linear_allocator<id> body_hull_ids;
 
-usize xp_get_memory_requirements(u32 num_convex_hull_verts, u32 num_contacts, u32 num_bodies)
+usize xp_get_persistent_memory_requirements(u32 num_convex_hull_verts, u32 num_bodies)
 {
 	return sizeof(real) * num_convex_hull_verts * 3 +
 		sizeof(xp_convex_hull) * num_bodies +
-		sizeof(xp_contact_manifold) * num_contacts +
 		sizeof(vreal4) * num_bodies * 2 +	// positions + linear_velocities
 		sizeof(qreal) * num_bodies * 2 +	// orientations + angular_velocities
 		sizeof(real) * num_bodies * 2 +		// inv_masses + inv_inertias
 		sizeof(id) * num_bodies;			// body_hull_ids
+}
+
+usize xp_get_transient_memory_requirements(u32 num_contacts, u32 num_bodies)
+{
+	return sizeof(xp_contact_manifold) * num_contacts +
+		sizeof(xp_aabb) * num_bodies +
+		sizeof(xp_broadphase_pair) * num_contacts;
 }
 
 bool xp_init(const memory_provider* mp, u32 convex_hulls_verts_budget, u32 bodies_budget)

@@ -76,7 +76,8 @@ typedef struct
 
 constexpr id INVALID_ID = (id)-1;
 
-XP_EXTERN_C XP_API usize xp_get_memory_requirements(u32 num_convex_hull_verts, u32 num_contacts, u32 num_bodies);
+XP_EXTERN_C XP_API usize xp_get_persistent_memory_requirements(u32 num_convex_hull_verts, u32 num_bodies);
+XP_EXTERN_C XP_API usize xp_get_transient_memory_requirements(u32 num_contacts, u32 num_bodies);
 XP_EXTERN_C XP_API bool xp_init(const memory_provider* provider, u32 convex_hulls_verts_budget, u32 bodies_budget);
 XP_EXTERN_C XP_API void xp_uninit();
 XP_EXTERN_C XP_API void xp_step(second dt);
