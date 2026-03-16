@@ -3,7 +3,7 @@
 //	(C) 2026 Alan Moczulski
 //
 
-#include "xp.hxx"
+#include "xp.h"
 #include "xp_broadphase.hxx"
 #include "xp_internal.hxx"
 #include "xp_math.hxx"

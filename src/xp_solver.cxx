@@ -1,3 +1,8 @@
+//
+//	xphysics rigid body dynamics engine
+//	(C) 2026 Alan Moczulski
+//
+
 #include "xp_solver.hxx"
 #include "xp_math_operators.hxx"
 

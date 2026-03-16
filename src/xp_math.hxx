@@ -1,8 +1,4 @@
 //
-//	xphysics math
-//
-//	(C) 2026 Alan Moczulski
-//
 //	Notes:
 //	- x64 calling conventions can pass __m128 and __m256 in registers natively if the types are small enough,
 //	but it's still worth checking the disassembly to make sure the compiler hasn't done anything crazy
@@ -10,8 +6,8 @@
 //
 
 #pragma once
-#include "xp.hxx"
-#include <math.h>
+#include "xp.h"
+#include <cmath>
 
 #if XP_USE_DOUBLE_PRECISION
 	#if defined(__AVX__)
@@ -70,7 +66,7 @@ inline vreal4 vnormalize(const vreal4 v)
 	const real dp = vdot(v, v);
 
 	// todo: simd optimization possible
-	const real len = 1.0 / sqrt(dp);
+	const real len = 1.0 / std::sqrt(dp);
 	
 	vreal4 result;
 	result.x = v.x * len;
@@ -111,7 +107,7 @@ inline qreal qnormalize(const qreal q)
 		return q;
 
 	// todo: simd optimization possible
-	const real len = 1.0 / sqrt(dp);
+	const real len = 1.0 / std::sqrt(dp);
 	
 	qreal result;
 	result.i = q.i * len;
@@ -137,12 +133,12 @@ inline qreal qangles(real x, real y, real z)
 	const real hz = z * 0.5f;
 
 	// todo: can we use a single SSE intrinsic here for sine and cosine computation?
-	const real shx = sin(hx);
-	const real chx = cos(hx);
-	const real shy = sin(hy);
-	const real chy = cos(hy);
-	const real shz = sin(hz);
-	const real chz = cos(hz);
+	const real shx = std::sin(hx);
+	const real chx = std::cos(hx);
+	const real shy = std::sin(hy);
+	const real chy = std::cos(hy);
+	const real shz = std::sin(hz);
+	const real chz = std::cos(hz);
 
 	const real sc = shx * chy;
 	const real cs = chx * shy;

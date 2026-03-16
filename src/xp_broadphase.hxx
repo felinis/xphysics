@@ -2,7 +2,7 @@
 #include "xp_internal.hxx"
 #include "xp_math.hxx"
 
-// 16-bit quantized AABB
+// 16-bit quantized aabb
 struct xp_aabb
 {
 	u16 min[3];
