@@ -36,7 +36,6 @@ inline vreal4 xp_get_minkowski_support(const xp_convex_hull& hull_a, const xp_co
 	return furthest_vert_of_a - furthest_vert_of_b;
 }
 
-
 bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 {
 	const vreal4 a = simplex.points[0];
