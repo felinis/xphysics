@@ -157,19 +157,19 @@ void xp_step(second dt)
 		const xp_convex_hull& hull_b = convex_hulls[hull_id_b];
 
 		xp_simplex simplex;
-		if (xp_gjk_intersect(hull_a, hull_b, simplex))
+		if (xp_gjk_intersect(hull_a, positions[id_a], orientations[id_a], hull_b, positions[id_b], orientations[id_b], simplex))
 		{
 			vreal4 normal;
 			real penetration_depth;
-			if (xp_epa_expand(hull_a, hull_b, simplex, normal, penetration_depth))
+			if (xp_epa_expand(hull_a, positions[id_a], orientations[id_a], hull_b, positions[id_b], orientations[id_b], simplex, normal, penetration_depth))
 			{
 				xp_contact_manifold& m = manifolds[nmanifolds++];
 				m.body_a = id_a;
 				m.body_b = id_b;
-				m.normal = normal;
+				m.normal = -normal; // we need to negate the normal since epa returns outward normal of minkowski(a - b) but the solver expects normal from b to a
 				m.penetration_depth = penetration_depth;
 				// hack: approximate contact point as midpoint between the two body centers shifted along the normal
-				m.pos = positions[id_a] + normal * (penetration_depth * 0.5);
+				m.pos = positions[id_a] + m.normal * (penetration_depth * 0.5);
 				m.accumulated_impulse = 0.0;
 			}
 		}

@@ -165,6 +165,24 @@ inline qreal qmul(const qreal a, const qreal b)
 	return result;
 }
 
+// vector * scalar
+inline vreal4 vscale(const vreal4 v, const real s)
+{
+	vreal4 result;
+	result.simd = _mm256_mul_pd(v.simd, _mm256_set1_pd(s));
+	return result;
+}
+
+// rotate a vector by a quaternion: v' = q * v * conjugate(q)
+inline vreal4 qrotate(const qreal q, const vreal4 v)
+{
+	const vreal4 qv = { q.i, q.j, q.k, 0.0 };
+	const vreal4 t = vscale(vcross(qv, v), 2.0);
+	vreal4 result = vadd(vadd(v, vscale(t, q.r)), vcross(qv, t));
+	result.w = 0.0;
+	return result;
+}
+
 typedef union
 {
 	real data[12];

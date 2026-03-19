@@ -27,13 +27,25 @@ inline vreal4 xp_get_convex_hull_support(const xp_convex_hull& hull, const vreal
 	return best_vert;
 }
 
-// computes a point on the boundary of the minkowski difference of two convex hulls
-inline vreal4 xp_get_minkowski_support(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b, const vreal4& dir)
+// computes a point on the boundary of the minkowski difference of two convex hulls in world space
+inline vreal4 xp_get_minkowski_support(
+	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
+	const vreal4& dir)
 {
-	vreal4 furthest_vert_of_a = xp_get_convex_hull_support(hull_a, dir);
-	vreal4 furthest_vert_of_b = xp_get_convex_hull_support(hull_b, -dir); // opposite direction
-	// todo: do we have to convert to world space here?
-	return furthest_vert_of_a - furthest_vert_of_b;
+	// transform search direction into A's local frame, find support, transform back to world
+	const qreal inv_orient_a = qconjugate(orient_a);
+	const vreal4 local_dir_a = qrotate(inv_orient_a, dir);
+	vreal4 support_a = xp_get_convex_hull_support(hull_a, local_dir_a);
+	support_a = vadd(qrotate(orient_a, support_a), pos_a);
+
+	// transform negated direction into B's local frame, find support, transform back to world
+	const qreal inv_orient_b = qconjugate(orient_b);
+	const vreal4 local_dir_b = qrotate(inv_orient_b, -dir);
+	vreal4 support_b = xp_get_convex_hull_support(hull_b, local_dir_b);
+	support_b = vadd(qrotate(orient_b, support_b), pos_b);
+
+	return support_a - support_b;
 }
 
 bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
@@ -195,13 +207,16 @@ bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 	return false;
 }
 
-bool xp_gjk_intersect(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b, xp_simplex& simplex)
+bool xp_gjk_intersect(
+	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
+	xp_simplex& simplex)
 {
 	vreal4 search_direction = { 1.0, 0.0, 0.0, 0.0 }; // todo: cache and get the one from previous frame so we have O(1)
 
 	// get the first point on the minkowski difference
 	simplex.count = 0;
-	simplex.push(xp_get_minkowski_support(hull_a, hull_b, search_direction));
+	simplex.push(xp_get_minkowski_support(hull_a, pos_a, orient_a, hull_b, pos_b, orient_b, search_direction));
 
 	// search towards the origin
 	search_direction = -search_direction;
@@ -210,7 +225,7 @@ bool xp_gjk_intersect(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b
 	const u32 MAX_GJK_ITERATIONS = 64; // we need this to prevent infinite loops
 	for (u32 i = 0; i < MAX_GJK_ITERATIONS; ++i)
 	{
-		const vreal4 point = xp_get_minkowski_support(hull_a, hull_b, search_direction);
+		const vreal4 point = xp_get_minkowski_support(hull_a, pos_a, orient_a, hull_b, pos_b, orient_b, search_direction);
 		// if the furthesr point in the search direction does not pass the origin,
 		// it means that the origin cannot be inside the minkowski difference
 		if (vdot(point, search_direction) < 0.0)
@@ -275,8 +290,8 @@ inline void xp_add_epa_edge(xp_epa_edge* edges, u32& nedges, const vreal4& a, co
 }
 
 bool xp_epa_expand(
-	const xp_convex_hull& hull_a,
-	const xp_convex_hull& hull_b,
+	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
 	xp_simplex& simplex,
 	vreal4& normal,
 	real& penetration_depth
@@ -323,7 +338,7 @@ bool xp_epa_expand(
 		xp_epa_face closest_face = faces[min_face_index];
 
 		// find a new point in the direction of the normal
-		const vreal4 support_point = xp_get_minkowski_support(hull_a, hull_b, closest_face.normal);
+		const vreal4 support_point = xp_get_minkowski_support(hull_a, pos_a, orient_a, hull_b, pos_b, orient_b, closest_face.normal);
 		const real support_dist = vdot(closest_face.normal, support_point);
 
 		// tolerance check: if the support point is not significantly further than the face,

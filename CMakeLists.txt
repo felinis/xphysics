@@ -17,7 +17,7 @@ set(HEADERS
 	src/xp_math_operators.hxx
 	src/xp_narrowphase.hxx
 	src/xp_solver.hxx
-	inc/xp.hxx
+	inc/xp.h
 )
 
 add_library(xphysics SHARED ${SOURCES} ${HEADERS})

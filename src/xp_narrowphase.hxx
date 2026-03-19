@@ -19,11 +19,14 @@ struct xp_simplex
 	}
 };
 
-bool xp_gjk_intersect(const xp_convex_hull& hull_a, const xp_convex_hull& hull_b, xp_simplex& simplex);
+bool xp_gjk_intersect(
+	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
+	xp_simplex& simplex);
 
 bool xp_epa_expand(
-	const xp_convex_hull& hull_a,
-	const xp_convex_hull& hull_b,
+	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
 	xp_simplex& simplex,
 	vreal4& normal,
 	real& penetration_depth
