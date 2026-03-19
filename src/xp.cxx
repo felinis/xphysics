@@ -133,7 +133,7 @@ void xp_step(second dt)
 
 	// perform broadphase aabb collision detection
 	// todo: can we optimize by only passing in bodies that are not sleeping?
-	const memory_range<xp_broadphase_pair> broadphase_pairs = xp_broadphase_sweep_and_prune(active_body_count, positions.memory, transient_arena);
+	const memory_range<xp_broadphase_pair> broadphase_pairs = xp_broadphase_sweep_and_prune(active_body_count, positions.memory, orientations.memory, body_hull_ids.memory, convex_hulls.memory, transient_arena);
 	const u32 npairs = (u32)broadphase_pairs.size();
 
 	// perform narrowphase gjk and epa collision detection
@@ -168,8 +168,8 @@ void xp_step(second dt)
 				m.body_b = id_b;
 				m.normal = -normal; // we need to negate the normal since epa returns outward normal of minkowski(a - b) but the solver expects normal from b to a
 				m.penetration_depth = penetration_depth;
-				// hack: approximate contact point as midpoint between the two body centers shifted along the normal
-				m.pos = positions[id_a] + m.normal * (penetration_depth * 0.5);
+				// approximate contact point on body B's surface along the collision normal
+				m.pos = positions[id_b] - m.normal * (penetration_depth * 0.5);
 				m.accumulated_impulse = 0.0;
 			}
 		}
@@ -278,4 +278,12 @@ void xp_set_body_position(id body_id, const real position[3])
 	positions[body_id].data[0] = position[0];
 	positions[body_id].data[1] = position[1];
 	positions[body_id].data[2] = position[2];
+}
+
+void xp_get_body_orientation(id body_id, real out_orientation[4])
+{
+	out_orientation[0] = orientations[body_id].data[0];
+	out_orientation[1] = orientations[body_id].data[1];
+	out_orientation[2] = orientations[body_id].data[2];
+	out_orientation[3] = orientations[body_id].data[3];
 }

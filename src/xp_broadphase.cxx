@@ -24,7 +24,7 @@ inline bool aabb_compare_x(const xp_aabb& a, const xp_aabb& b)
 	return a.min[0] < b.min[0];
 }
 
-memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, linear_allocator<u8>& transient_arena)
+memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_hull_ids, const xp_convex_hull* hulls, linear_allocator<u8>& transient_arena)
 {
 	// we need to allocate space for the aabbs in the transient arena
 	const usize aabb_arena_size = sizeof(xp_aabb) * active_body_count;
@@ -36,19 +36,54 @@ memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_c
 		return {};
 	}
 
-	// compute and quantize aabbs for all active bodies
-	// temporarily we calculate the aabbs in a dummy way
+	// compute and quantize aabbs from the actual convex hull vertices
 	for (u32 i = 0; i < active_body_count; ++i)
 	{
 		const vreal4& pos = body_positions[i];
-		const real half_extents = 1.0; // just a dummy value for now
-		
-		aabbs[i].min[0] = quantize_coordinate(pos.data[0] - half_extents);
-		aabbs[i].min[1] = quantize_coordinate(pos.data[1] - half_extents);
-		aabbs[i].min[2] = quantize_coordinate(pos.data[2] - half_extents);
-		aabbs[i].max[0] = quantize_coordinate(pos.data[0] + half_extents);
-		aabbs[i].max[1] = quantize_coordinate(pos.data[1] + half_extents);
-		aabbs[i].max[2] = quantize_coordinate(pos.data[2] + half_extents);
+		const id hull_id = body_hull_ids[i];
+
+		if (hull_id != INVALID_ID)
+		{
+			const xp_convex_hull& hull = hulls[hull_id];
+			const qreal& orient = body_orientations[i];
+
+			// rotate each hull vertex and find min/max extents
+			vreal4 vert0 = { hull.verts[0], hull.verts[1], hull.verts[2], 0.0 };
+			vreal4 rotated0 = qrotate(orient, vert0);
+			real aabb_min[3] = { rotated0.x, rotated0.y, rotated0.z };
+			real aabb_max[3] = { rotated0.x, rotated0.y, rotated0.z };
+
+			for (usize v = 1; v < hull.nverts; ++v)
+			{
+				vreal4 vert = { hull.verts[v * 3], hull.verts[v * 3 + 1], hull.verts[v * 3 + 2], 0.0 };
+				vreal4 rotated = qrotate(orient, vert);
+
+				if (rotated.x < aabb_min[0]) aabb_min[0] = rotated.x;
+				if (rotated.y < aabb_min[1]) aabb_min[1] = rotated.y;
+				if (rotated.z < aabb_min[2]) aabb_min[2] = rotated.z;
+				if (rotated.x > aabb_max[0]) aabb_max[0] = rotated.x;
+				if (rotated.y > aabb_max[1]) aabb_max[1] = rotated.y;
+				if (rotated.z > aabb_max[2]) aabb_max[2] = rotated.z;
+			}
+
+			aabbs[i].min[0] = quantize_coordinate(pos.data[0] + aabb_min[0]);
+			aabbs[i].min[1] = quantize_coordinate(pos.data[1] + aabb_min[1]);
+			aabbs[i].min[2] = quantize_coordinate(pos.data[2] + aabb_min[2]);
+			aabbs[i].max[0] = quantize_coordinate(pos.data[0] + aabb_max[0]);
+			aabbs[i].max[1] = quantize_coordinate(pos.data[1] + aabb_max[1]);
+			aabbs[i].max[2] = quantize_coordinate(pos.data[2] + aabb_max[2]);
+		}
+		else
+		{
+			// no hull attached, use a unit-sized fallback
+			aabbs[i].min[0] = quantize_coordinate(pos.data[0] - 0.5);
+			aabbs[i].min[1] = quantize_coordinate(pos.data[1] - 0.5);
+			aabbs[i].min[2] = quantize_coordinate(pos.data[2] - 0.5);
+			aabbs[i].max[0] = quantize_coordinate(pos.data[0] + 0.5);
+			aabbs[i].max[1] = quantize_coordinate(pos.data[1] + 0.5);
+			aabbs[i].max[2] = quantize_coordinate(pos.data[2] + 0.5);
+		}
+
 		aabbs[i].body_id = i;
 	}
 
