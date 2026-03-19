@@ -29,6 +29,10 @@ void xp_solve_contacts(
 		{
 			xp_contact_manifold& c = manifolds[i];
 
+			// skip contacts where both bodies are immovable (avoids division by zero)
+			if (inv_masses[c.body_a] == 0.0 && inv_masses[c.body_b] == 0.0)
+				continue;
+
 			const vreal4 n = c.normal;
 			const vreal4 p = c.pos;
 			const vreal4 posA = positions[c.body_a];
