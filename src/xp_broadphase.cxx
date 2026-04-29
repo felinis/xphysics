@@ -24,11 +24,11 @@ inline bool aabb_compare_x(const xp_aabb& a, const xp_aabb& b)
 	return a.min[0] < b.min[0];
 }
 
-memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_hull_ids, const xp_convex_hull* hulls, linear_allocator<u8>& transient_arena)
+MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_hull_ids, const XPConvexHull* hulls, LinearAllocator<u8>& transient_arena)
 {
 	// we need to allocate space for the aabbs in the transient arena
 	const usize aabb_arena_size = sizeof(xp_aabb) * active_body_count;
-	xp_aabb* aabbs = (xp_aabb*)transient_arena.push_bytes(aabb_arena_size);
+	xp_aabb* aabbs = (xp_aabb*)transient_arena.PushBytes(aabb_arena_size);
 
 	if (!aabbs)
 	{
@@ -44,7 +44,7 @@ memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_c
 
 		if (hull_id != INVALID_ID)
 		{
-			const xp_convex_hull& hull = hulls[hull_id];
+			const XPConvexHull& hull = hulls[hull_id];
 			const qreal& orient = body_orientations[i];
 
 			// rotate each hull vertex and find min/max extents
@@ -93,7 +93,7 @@ memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_c
 
 	// now we need to go through the sorted aabbs and find overlaps
 	// we will put them as we find them in the transient arena (so we don't know the initial size)
-	xp_broadphase_pair* pairs = (xp_broadphase_pair*)(transient_arena.memory + transient_arena.offset);
+	xp_broadphase_pair* pairs = (xp_broadphase_pair*)(transient_arena.memory + transient_arena.size);
 	u32 npairs = 0;
 
 	for (u32 i = 0; i < active_body_count; ++i)
@@ -117,7 +117,7 @@ memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_c
 			if (overlap_y && overlap_z)
 			{
 				// push a new pair to the transient arena
-				xp_broadphase_pair* new_pair = (xp_broadphase_pair*)transient_arena.push_bytes(sizeof(xp_broadphase_pair));
+				xp_broadphase_pair* new_pair = (xp_broadphase_pair*)transient_arena.PushBytes(sizeof(xp_broadphase_pair));
 				if (new_pair)
 				{
 					new_pair->body_id_a = a.body_id;

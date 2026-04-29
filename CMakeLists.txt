@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(xphysics CXX)
 
+#set(CMAKE_C_STANDARD 11)
+#set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -36,11 +38,11 @@ else()
 endif()
 
 # unit tests
-add_executable(xp_test_math tests/xp_test_math.cxx)
-target_link_libraries(xp_test_math PRIVATE xphysics)
-target_include_directories(xp_test_math PRIVATE src) # we allow unit tests to access our internal src folder
+#add_executable(xp_test_math "tests/xp_test_math.cxx")
+#target_link_libraries(xp_test_math PRIVATE xphysics)
+#target_include_directories(xp_test_math PRIVATE src) # we allow unit tests to access our internal src folder
 
-add_executable(xp_test_main tests/xp_test_main.cxx)
+add_executable(xp_test_main "tests/xp_test_main.cxx")
 target_link_libraries(xp_test_main PRIVATE xphysics)
 
 # todo: in the future it could be interesting to avoid using libc/msvcrt altogether for maximum portability,

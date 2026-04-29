@@ -25,6 +25,10 @@
 
 #pragma once
 
+#ifndef XP_CHECKED_BUILD
+#define XP_CHECKED_BUILD 1
+#endif
+
 // architecture bitness
 #if defined(__amd64__) || defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)
 	#define XP_ARCH_BITNESS_64 1
@@ -97,28 +101,40 @@ typedef struct
 	usize persistent_size;
 	u8* transient_memory;
 	usize transient_size;
-} memory_provider;
+} XPMemoryProvider;
+
+struct XPContext;
 
 #define INVALID_ID (id)(-1)
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 // memory management
-XP_EXTERN_C XP_API usize xp_get_persistent_memory_requirements(u32 num_convex_hull_verts, u32 num_bodies);
-XP_EXTERN_C XP_API usize xp_get_transient_memory_requirements(u32 num_contacts, u32 num_bodies);
+XP_API usize XPGetPersistentMemoryRequirements(u32 num_convex_hull_verts, u32 num_bodies);
+XP_API usize XPGetTransientMemoryRequirements(u32 num_contacts, u32 num_bodies);
 
 // main functions
-XP_EXTERN_C XP_API bool xp_init(const memory_provider* provider, u32 convex_hulls_verts_budget, u32 bodies_budget);
-XP_EXTERN_C XP_API void xp_uninit();
-XP_EXTERN_C XP_API void xp_step(second dt);
+XP_API XPContext* XPInit(const XPMemoryProvider* mp, u32 convex_hulls_verts_budget, u32 bodies_budget);
+XP_API void XPUninit(XPContext* xpc);
+XP_API void XPStep(XPContext* xpc, second dt);
 
 // rigid body functions
-XP_EXTERN_C XP_API id xp_create_fixed_body();
-XP_EXTERN_C XP_API id xp_create_dynamic_body(kilogram mass); // todo: provide inertia type enum? inertia must be known for proper dynamics
-XP_EXTERN_C XP_API void xp_destroy_body(id body_id);
-XP_EXTERN_C XP_API void xp_attach_shape(id body_id, id shape_id);
-XP_EXTERN_C XP_API void xp_get_body_position(id body_id, real out_position[3]);
-XP_EXTERN_C XP_API void xp_set_body_position(id body_id, const real position[3]);
+XP_API id XPCreateFixedBody(XPContext* xpc);
+XP_API id XPCreateDynamicBody(XPContext* xpc, kilogram mass); // todo: provide inertia type enum? inertia must be known for proper dynamics
+XP_API void XPDestroyBody(XPContext* xpc, id body_id);
+XP_API void XPAttachShape(XPContext* xpc, id body_id, id shape_id);
+XP_API void XPGetBodyPosition(XPContext* xpc, id body_id, real out_position[3]);
+XP_API void XPSetBodyPosition(XPContext* xpc, id body_id, const real position[3]);
 // todo: push body
 
 // shape functions
-XP_EXTERN_C XP_API id xp_create_convex_hull(const real* vertex_positions, u32 vertex_count);
+XP_API id XPCreateOrientedBox(XPContext* xpc);
+XP_API id XPCreateConvexHull(XPContext* xpc, const real* vertex_positions, u32 vertex_count);
 // todo: terrain/heightfield
+
+#ifdef __cplusplus
+}
+#endif

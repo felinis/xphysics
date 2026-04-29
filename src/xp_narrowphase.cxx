@@ -7,7 +7,7 @@
 #include "xp_math_operators.hxx"
 
 // support mapping function: finds the furthest vertex of the convex hull in a given direction 
-inline vreal4 xp_get_convex_hull_support(const xp_convex_hull& hull, const vreal4& dir)
+inline vreal4 xp_get_convex_hull_support(const XPConvexHull& hull, const vreal4& dir)
 {
 	vreal4 best_vert = { hull.verts[0], hull.verts[1], hull.verts[2], 0.0 };
 	real max_dot = vdot(best_vert, dir);
@@ -29,8 +29,8 @@ inline vreal4 xp_get_convex_hull_support(const xp_convex_hull& hull, const vreal
 
 // computes a point on the boundary of the minkowski difference of two convex hulls in world space
 inline vreal4 xp_get_minkowski_support(
-	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
-	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
+	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
 	const vreal4& dir)
 {
 	// transform search direction into A's local frame, find support, transform back to world
@@ -208,8 +208,8 @@ bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 }
 
 bool xp_gjk_intersect(
-	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
-	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
+	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
 	xp_simplex& simplex)
 {
 	vreal4 search_direction = { 1.0, 0.0, 0.0, 0.0 }; // todo: cache and get the one from previous frame so we have O(1)
@@ -290,8 +290,8 @@ inline void xp_add_epa_edge(xp_epa_edge* edges, u32& nedges, const vreal4& a, co
 }
 
 bool xp_epa_expand(
-	const xp_convex_hull& hull_a, const vreal4& pos_a, const qreal& orient_a,
-	const xp_convex_hull& hull_b, const vreal4& pos_b, const qreal& orient_b,
+	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
+	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
 	xp_simplex& simplex,
 	vreal4& normal,
 	real& penetration_depth

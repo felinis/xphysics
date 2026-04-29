@@ -1,45 +1,49 @@
 #pragma once
 #include "xp.h"
 
-struct xp_convex_hull
+struct XPConvexHull
 {
 	usize nverts;
 	real* verts; // interleaved xyz positions
 };
 
 template <typename T>
-struct linear_allocator
+struct LinearAllocator
 {
 	T* memory;
+	usize capacity;
 	usize size;
-	usize offset;
 
-	linear_allocator() : memory(nullptr), size(0), offset(0) {}
-	linear_allocator(T* memory, usize size) : memory(memory), size(size), offset(0) {}
+	LinearAllocator() = default;
+	explicit LinearAllocator(T* memory, usize capacity) : memory(memory), capacity(capacity), size(0) {}
 
-	void* push_bytes(usize count)
+	void* PushBytes(usize count)
 	{
-		if (offset + count > size)
+		// make sure we don't go out of bounds
+		if (size + count > capacity)
 			return nullptr;
 
-		void* result = reinterpret_cast<u8*>(memory) + offset;
-		offset += count;
+		void* result = reinterpret_cast<u8*>(memory) + size;
+		size += count;
 		return result;
 	}
 
-	void reset() { offset = 0; }
+	void Reset() { size = 0; }
 
 	T& operator[](usize i) { return memory[i]; }
 	const T& operator[](usize i) const { return memory[i]; }
 };
 
 template <typename T>
-struct memory_range
+struct MemoryRange
 {
 	T* begin;
 	T* end;
 
-	usize size() const { return end - begin; }
+	usize GetSize() const { return end - begin; }
+	usize GetCount() const { return (end - begin) / sizeof(T); }
+
+	// iterators
 	T& operator[](usize i) { return begin[i]; }
 	const T& operator[](usize i) const { return begin[i]; }
 };

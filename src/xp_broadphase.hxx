@@ -17,4 +17,4 @@ struct xp_broadphase_pair
 	id body_id_b;
 };
 
-memory_range<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_hull_ids, const xp_convex_hull* hulls, linear_allocator<u8>& transient_arena);
+MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_hull_ids, const XPConvexHull* hulls, LinearAllocator<u8>& transient_arena);

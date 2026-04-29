@@ -4,19 +4,19 @@
 
 int main()
 {
-	const usize persistent_size = xp_get_persistent_memory_requirements(1024, 128);
-	const usize transient_size = xp_get_transient_memory_requirements(128, 128);
-	u8* mem = reinterpret_cast<u8*>(malloc(persistent_size + transient_size));
+	const usize persistent_size = XPGetPersistentMemoryRequirements(1024, 128);
+	const usize transient_size = XPGetTransientMemoryRequirements(128, 128);
+	u8* mem = (u8*)malloc(persistent_size + transient_size);
 
-	memory_provider mp;
-	mp.persistent_memory = mem;
-	mp.persistent_size = persistent_size;
-	mp.transient_memory = mem + persistent_size;
-	mp.transient_size = transient_size;
+	XPMemoryProvider xmp;
+	xmp.persistent_memory = mem;
+	xmp.persistent_size = persistent_size;
+	xmp.transient_memory = mem + persistent_size;
+	xmp.transient_size = transient_size;
 
 	int result = 0;
 
-	if (xp_init(&mp, 64, 128))
+	if (XPContext* xpc = XPInit(&xmp, 64, 128))
 	{
 		const real cube_vertices[] = {
 			-0.5, -0.5, -0.5,
@@ -40,26 +40,30 @@ int main()
 			 5.0,  5.0,  0.5
 		};
 
-		id cube_shape = xp_create_convex_hull(cube_vertices, 8);
-		id floor_shape = xp_create_convex_hull(floor_vertices, 8);
+		id cube_shape = XPCreateConvexHull(xpc, cube_vertices, 8);
+		id floor_shape = XPCreateConvexHull(xpc, floor_vertices, 8);
 
-		id floor_body = xp_create_fixed_body();
-		xp_attach_shape(floor_body, floor_shape);
-		const real floor_pos[3] = {0.0, 0.0, -1.0};
-		xp_set_body_position(floor_body, floor_pos);
+		id floor_body = XPCreateFixedBody(xpc);
+		XPAttachShape(xpc, floor_body, floor_shape);
+		const real floor_pos[3] = {0.0, 0.0, 0.0};
+		XPSetBodyPosition(xpc, floor_body, floor_pos);
 
-		id cube_body = xp_create_dynamic_body(10.0);
-		xp_attach_shape(cube_body, cube_shape);
-		const real cube_pos[3] = {0.0, 0.0, 5.0};
-		xp_set_body_position(cube_body, cube_pos);
+		id cube_body = XPCreateDynamicBody(xpc, 10.0);
+		XPAttachShape(xpc, cube_body, cube_shape);
+		const real cube_pos[3] = {0.0, 0.0, 3.0};
+		XPSetBodyPosition(xpc, cube_body, cube_pos);
+		printf("Cube height:\n3.0\n");
+
+//		const real gravity[3] = { 0.0, 0.0, -9.81 };
+//		XPSetGravity(xpc, gravity);
 
 		for (int i = 0; i < 120; ++i)
 		{
-			xp_step(1.0 / 60.0);
+			XPStep(xpc, 1.0 / 60.0);
 
 			real body_position[3];
-			xp_get_body_position(cube_body, body_position);
-			printf("%.4f\n", body_position[2]);
+			XPGetBodyPosition(xpc, cube_body, body_position);
+			printf("%.3f\n", body_position[2]);
 		}
 #if 0
 		if (final_pos[2] < -0.1) // we allow slight penetration due to PGS solver tolerance, but it should not be very negative
@@ -72,8 +76,8 @@ int main()
 			printf("TEST PASSED: cube is resting on the floor.\n");
 		}
 #endif
-		xp_destroy_body(cube_body);
-		xp_destroy_body(floor_body);
+		XPDestroyBody(xpc, cube_body);
+		XPDestroyBody(xpc, floor_body);
 	}
 	else
 	{
