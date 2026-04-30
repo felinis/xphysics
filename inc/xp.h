@@ -103,6 +103,11 @@ typedef struct
 	usize transient_size;
 } XPMemoryProvider;
 
+typedef struct
+{
+	void (__stdcall *error_report_func)(const char* str);
+} XPReporter;
+
 struct XPContext;
 
 #define INVALID_ID (id)(-1)
@@ -117,8 +122,10 @@ XP_API usize XPGetPersistentMemoryRequirements(u32 num_convex_hull_verts, u32 nu
 XP_API usize XPGetTransientMemoryRequirements(u32 num_contacts, u32 num_bodies);
 
 // main functions
-XP_API XPContext* XPInit(const XPMemoryProvider* mp, u32 convex_hulls_verts_budget, u32 bodies_budget);
+XP_API XPContext* XPInit(const XPMemoryProvider* mp, const XPReporter* r, u32 convex_hulls_verts_budget, u32 bodies_budget);
 XP_API void XPUninit(XPContext* xpc);
+
+XP_API void XPSetGravity(XPContext* xpc, const real gravity[3]);
 XP_API void XPStep(XPContext* xpc, second dt);
 
 // rigid body functions
@@ -128,10 +135,12 @@ XP_API void XPDestroyBody(XPContext* xpc, id body_id);
 XP_API void XPAttachShape(XPContext* xpc, id body_id, id shape_id);
 XP_API void XPGetBodyPosition(XPContext* xpc, id body_id, real out_position[3]);
 XP_API void XPSetBodyPosition(XPContext* xpc, id body_id, const real position[3]);
+XP_API void XPGetBodyLinearVelocity(XPContext* xpc, id body_id, real out_velocity[3]);
+XP_API void XPGetBodyOrientation(XPContext* xpc, id body_id, real out_orientation[4]);
 // todo: push body
 
 // shape functions
-XP_API id XPCreateOrientedBox(XPContext* xpc);
+//XP_API id XPCreateOrientedBox(XPContext* xpc);
 XP_API id XPCreateConvexHull(XPContext* xpc, const real* vertex_positions, u32 vertex_count);
 // todo: terrain/heightfield
 

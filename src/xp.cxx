@@ -17,26 +17,31 @@ struct XPContext
 	LinearAllocator<u8> persistent_arena;
 	LinearAllocator<u8> transient_arena;
 
-	// rigid body SoA components
-	u32 active_body_count = 0;
-	LinearAllocator<vreal4> positions;
-	LinearAllocator<vreal4> linear_velocities;
-	LinearAllocator<qreal> orientations;
-	LinearAllocator<qreal> angular_velocities;
-	LinearAllocator<real> inv_masses;
-	LinearAllocator<real> inv_inertias;
+	// optional user-defined function to inform about errors
+	void (*error_report_func)(const char* str);
 
-	// todo: oriented box storage
+	vreal4 gravity;
 
-	// convex hull storage
-	LinearAllocator<real> convex_hulls_verts;
-	LinearAllocator<XPConvexHull> convex_hulls;
-	u32 convex_hull_count = 0;
+	// rigid body solver components
+	u32 bodies_capacity;
+	u32 bodies_count;
+	vreal4* positions;
+	vreal4* linear_velocities;
+	qreal* orientations;
+	qreal* angular_velocities;
+	real* inv_masses;
+	vreal4* inv_inertias; // packed diagonal components x, y, z of the inetria tensor
+
+	// collision components
+	u32 convex_hulls_capacity;
+	u32 convex_hulls_count;
+	real* convex_hulls_verts; // contains all convex hulls' verts
+	XPConvexHull* convex_hulls;
 
 	// todo: heightmap storage
 
 	// maps body id -> convex hull id
-	LinearAllocator<id> body_hull_ids;
+	id* body_shape_ids;
 };
 
 usize XPGetPersistentMemoryRequirements(u32 num_convex_hull_verts, u32 num_bodies)
@@ -46,17 +51,25 @@ usize XPGetPersistentMemoryRequirements(u32 num_convex_hull_verts, u32 num_bodie
 		sizeof(vreal4) * num_bodies * 2 +	// positions + linear_velocities
 		sizeof(qreal) * num_bodies * 2 +	// orientations + angular_velocities
 		sizeof(real) * num_bodies * 2 +		// inv_masses + inv_inertias
-		sizeof(id) * num_bodies;			// body_hull_ids
+		sizeof(id) * num_bodies;			// body_shape_ids
 }
 
 usize XPGetTransientMemoryRequirements(u32 num_contacts, u32 num_bodies)
 {
-	return sizeof(xp_contact_manifold) * num_contacts +
-		sizeof(xp_aabb) * num_bodies +
-		sizeof(xp_broadphase_pair) * num_contacts;
+	return sizeof(XPContactManifold) * num_contacts +
+		sizeof(XPBox) * num_bodies +
+		sizeof(XPBroadPair) * num_contacts;
 }
 
-XPContext* XPInit(const XPMemoryProvider* mp, u32 convex_hulls_verts_budget, u32 bodies_budget)
+void XPReport(const XPContext* xpc, const char* str)
+{
+#if XP_CHECKED_BUILD
+	if (xpc->error_report_func)
+		xpc->error_report_func(str);
+#endif
+}
+
+XPContext* XPInit(const XPMemoryProvider* mp, const XPReporter* reporter, u32 convex_hulls_verts_budget, u32 bodies_budget)
 {
 #if XP_CHECKED_BUILD
 	// validate memory
@@ -75,40 +88,50 @@ XPContext* XPInit(const XPMemoryProvider* mp, u32 convex_hulls_verts_budget, u32
 	xpc->persistent_arena = persistent_arena;
 	xpc->transient_arena = transient_arena;
 
-	xpc->active_body_count = 0;
+#if XP_CHECKED_BUILD
+	if (reporter)
+		xpc->error_report_func = reporter->error_report_func;
+#endif
 
-	// allocate convex hull vertex storage
-	const usize verts_size = sizeof(real) * convex_hulls_verts_budget * 3;
-	xpc->convex_hulls_verts = LinearAllocator<real>((real*)persistent_arena.PushBytes(verts_size), verts_size);
+	// default gravity
+	xpc->gravity = { 0.0, 0.0, -9.81, 0.0 };
 
-	// allocate convex hull descriptors
-	const usize hulls_size = sizeof(XPConvexHull) * bodies_budget;
-	xpc->convex_hulls = LinearAllocator<XPConvexHull>((XPConvexHull*)persistent_arena.PushBytes(hulls_size), hulls_size);
+	xpc->bodies_capacity = bodies_budget;
+	xpc->bodies_count = 0;
 
 	// allocate body SoA arrays
 	const usize pos_size = sizeof(vreal4) * bodies_budget;
-	xpc->positions = LinearAllocator<vreal4>((vreal4*)persistent_arena.PushBytes(pos_size), pos_size);
+	xpc->positions = (vreal4*)persistent_arena.PushBytes(pos_size);
 
 	const usize vel_size = sizeof(vreal4) * bodies_budget;
-	xpc->linear_velocities = LinearAllocator<vreal4>((vreal4*)persistent_arena.PushBytes(vel_size), vel_size);
+	xpc->linear_velocities = (vreal4*)persistent_arena.PushBytes(vel_size);
 
 	const usize orient_size = sizeof(qreal) * bodies_budget;
-	xpc->orientations = LinearAllocator<qreal>((qreal*)persistent_arena.PushBytes(orient_size), orient_size);
+	xpc->orientations = (qreal*)persistent_arena.PushBytes(orient_size);
 
 	const usize angvel_size = sizeof(qreal) * bodies_budget;
-	xpc->angular_velocities = LinearAllocator<qreal>((qreal*)persistent_arena.PushBytes(angvel_size), angvel_size);
+	xpc->angular_velocities = (qreal*)persistent_arena.PushBytes(angvel_size);
 
 	const usize mass_size = sizeof(real) * bodies_budget;
-	xpc->inv_masses = LinearAllocator<real>((real*)persistent_arena.PushBytes(mass_size), mass_size);
+	xpc->inv_masses = (real*)persistent_arena.PushBytes(mass_size);
 
-	const usize inertia_size = sizeof(real) * bodies_budget;
-	xpc->inv_inertias = LinearAllocator<real>((real*)persistent_arena.PushBytes(inertia_size), inertia_size);
+	const usize inertia_size = sizeof(vreal4) * bodies_budget;
+	xpc->inv_inertias = (vreal4*)persistent_arena.PushBytes(inertia_size);
+
+	xpc->convex_hulls_capacity = convex_hulls_verts_budget;
+	xpc->convex_hulls_count = 0;
+
+	// allocate convex hull vertex storage
+	const usize verts_size = sizeof(real) * convex_hulls_verts_budget * 3;
+	xpc->convex_hulls_verts = (real*)persistent_arena.PushBytes(verts_size);
+
+	// allocate convex hull descriptors
+	const usize hulls_size = sizeof(XPConvexHull) * bodies_budget;
+	xpc->convex_hulls = (XPConvexHull*)persistent_arena.PushBytes(hulls_size);
 
 	// allocate body-to-hull mapping
 	const usize hull_ids_size = sizeof(id) * bodies_budget;
-	xpc->body_hull_ids = LinearAllocator<id>((id*)persistent_arena.PushBytes(hull_ids_size), hull_ids_size);
-
-	xpc->convex_hull_count = 0;
+	xpc->body_shape_ids = (id*)persistent_arena.PushBytes(hull_ids_size);
 
 	return xpc;
 }
@@ -118,21 +141,25 @@ void XPUninit(XPContext* xpc)
 	// nothing to do since memory is owned by the caller
 }
 
+void XPSetGravity(XPContext* xpc, const real gravity[3])
+{
+	xpc->gravity.data[0] = gravity[0];
+	xpc->gravity.data[1] = gravity[1];
+	xpc->gravity.data[2] = gravity[2];
+}
+
 static void XPIntegrate(XPContext* xpc, second dt)
 {
-	const vreal4 gravity = { 0.0, 0.0, -9.81, 0.0 };
-
-	for (u32 i = 0; i < xpc->active_body_count; ++i)
+	for (u32 i = 0; i < xpc->bodies_count; ++i)
 	{
 		if (xpc->inv_masses[i] == 0.0)
 			continue; // skip static bodies
 
 		vreal4 lin_vel = xpc->linear_velocities[i];
-		qreal ang_vel = xpc->angular_velocities[i];
 
-		vreal4 gravity_step = gravity * dt;
+		const vreal4 gravity_step = xpc->gravity * dt;
 		lin_vel += gravity_step;
-		vreal4 pos_step = lin_vel * dt;
+		const vreal4 pos_step = lin_vel * dt;
 		xpc->positions[i] += pos_step;
 
 		xpc->linear_velocities[i] = lin_vel;
@@ -152,12 +179,12 @@ void XPStep(XPContext* xpc, second dt)
 
 	// perform broadphase aabb collision detection
 	// todo: can we optimize by only passing in bodies that are not sleeping?
-	const MemoryRange<xp_broadphase_pair> broadphase_pairs = xp_broadphase_sweep_and_prune(xpc->active_body_count, xpc->positions.memory, xpc->orientations.memory, xpc->body_hull_ids.memory, xpc->convex_hulls.memory, xpc->transient_arena);
+	const MemoryRange<XPBroadPair> broadphase_pairs = XPBroadSweepAndPrune(xpc->bodies_count, xpc->positions, xpc->orientations, xpc->body_shape_ids, xpc->convex_hulls, xpc->transient_arena);
 	const u32 npairs = (u32)broadphase_pairs.GetCount();
 
 	// perform narrowphase gjk and epa collision detection
 	// allocate space for contact manifolds in transient memory
-	xp_contact_manifold* manifolds = (xp_contact_manifold*)xpc->transient_arena.PushBytes(sizeof(xp_contact_manifold) * npairs);
+	XPContactManifold* manifolds = (XPContactManifold*)xpc->transient_arena.PushBytes(sizeof(XPContactManifold) * npairs);
 	u32 nmanifolds = 0;
 
 	for (u32 i = 0; i < npairs; ++i)
@@ -165,8 +192,8 @@ void XPStep(XPContext* xpc, second dt)
 		const id id_a = broadphase_pairs[i].body_id_a;
 		const id id_b = broadphase_pairs[i].body_id_b;
 
-		const id hull_id_a = xpc->body_hull_ids[id_a];
-		const id hull_id_b = xpc->body_hull_ids[id_b];
+		const id hull_id_a = xpc->body_shape_ids[id_a];
+		const id hull_id_b = xpc->body_shape_ids[id_b];
 
 		// skip pairs where either body has no hull attached
 		if (hull_id_a == INVALID_ID || hull_id_b == INVALID_ID)
@@ -182,10 +209,10 @@ void XPStep(XPContext* xpc, second dt)
 			real penetration_depth;
 			if (xp_epa_expand(hull_a, xpc->positions[id_a], xpc->orientations[id_a], hull_b, xpc->positions[id_b], xpc->orientations[id_b], simplex, normal, penetration_depth))
 			{
-				xp_contact_manifold& m = manifolds[nmanifolds++];
+				XPContactManifold& m = manifolds[nmanifolds++];
 				m.body_a = id_a;
 				m.body_b = id_b;
-				m.normal = -normal; // we need to negate the normal since epa returns outward normal of minkowski(a - b) but the solver expects normal from b to a
+				m.normal = normal; // we need to negate the normal since epa returns outward normal of minkowski(a - b) but the solver expects normal from b to a
 				m.penetration_depth = penetration_depth;
 				// approximate contact point on body B's surface along the collision normal
 				m.pos = xpc->positions[id_b] - m.normal * (penetration_depth * 0.5);
@@ -197,14 +224,14 @@ void XPStep(XPContext* xpc, second dt)
 	// collision resolution using pgs solver
 	if (nmanifolds > 0)
 	{
-		xp_solve_contacts(
+		XPSolveContacts(
 			nmanifolds,
 			manifolds,
-			xpc->positions.memory,
-			xpc->linear_velocities.memory,
-			(vreal4*)xpc->angular_velocities.memory, // cast qreal* to vreal4* as they have the same layout
-			xpc->inv_masses.memory,
-			xpc->inv_inertias.memory,
+			xpc->positions,
+			xpc->linear_velocities,
+			(vreal4*)xpc->angular_velocities, // cast qreal* to vreal4* as they have the same layout
+			xpc->inv_masses,
+			xpc->inv_inertias,
 			dt
 		);
 	}
@@ -215,7 +242,8 @@ void XPStep(XPContext* xpc, second dt)
 
 id XPCreateFixedBody(XPContext* xpc)
 {
-	const id body_id = xpc->active_body_count++;
+	// todo: check capacity
+	const id body_id = xpc->bodies_count++;
 
 	const vreal4 zero_v = { 0.0, 0.0, 0.0, 0.0 };
 	const qreal identity_q = { 0.0, 0.0, 0.0, 1.0 };
@@ -225,8 +253,8 @@ id XPCreateFixedBody(XPContext* xpc)
 	xpc->orientations[body_id] = identity_q;
 	xpc->angular_velocities[body_id] = { 0.0, 0.0, 0.0, 0.0 };
 	xpc->inv_masses[body_id] = 0.0; // infinite mass (static)
-	xpc->inv_inertias[body_id] = 0.0; // infinite inertia (static)
-	xpc->body_hull_ids[body_id] = INVALID_ID;
+	xpc->inv_inertias[body_id] = { 0.0, 0.0, 0.0, 0.0 }; // infinite inertia (static)
+	xpc->body_shape_ids[body_id] = INVALID_ID; // by default, no shape assigned
 
 	return body_id;
 }
@@ -234,10 +262,13 @@ id XPCreateFixedBody(XPContext* xpc)
 id XPCreateDynamicBody(XPContext* xpc, kilogram mass)
 {
 	if (mass <= 0.0)
+	{
+		XPReport(xpc, "Cannot create a dynamic body with null mass.\n");
 		return INVALID_ID;
+	}
 
-	const id body_id = xpc->active_body_count++;
-
+	// todo: check capacity
+	const id body_id = xpc->bodies_count++;
 	const vreal4 zero_v = { 0.0, 0.0, 0.0, 0.0 };
 	const qreal identity_q = { 0.0, 0.0, 0.0, 1.0 };
 
@@ -246,9 +277,36 @@ id XPCreateDynamicBody(XPContext* xpc, kilogram mass)
 	xpc->orientations[body_id] = identity_q;
 	xpc->angular_velocities[body_id] = { 0.0, 0.0, 0.0, 0.0 };
 	xpc->inv_masses[body_id] = 1.0 / mass;
-	// hack: we use a simplified scalar inertia for now, uniform sphere
-	xpc->inv_inertias[body_id] = 5.0 / (2.0 * mass);
-	xpc->body_hull_ids[body_id] = INVALID_ID;
+
+//	if (shape_type == ShapeType::ConvexHull)
+//	{
+//		const XPConvexHull* ch = (XPConvexHull*)shape;
+		// hack: we use a simplified scalar inertia for now, uniform sphere
+		vreal4 inv_inertia = { 5.0 / (2.0 * mass), 5.0 / (2.0 * mass), 5.0 / (2.0 * mass), 0 };
+		xpc->inv_inertias[body_id] = inv_inertia;
+//	}
+#if 0
+	else if (shape_type == ShapeType::Box)
+	{
+		const OrientedBox* ob = (OrientedBox*)shape;
+
+		// compute box inertia
+		//const real volume = 8.0 * ob->half_extents[0] * ob->half_extents[1] * ob->half_extents[2];
+
+		const real ex2 = ob->half_extents[0] * ob->half_extents[0];
+		const real ey2 = ob->half_extents[1] * ob->half_extents[1];
+		const real ez2 = ob->half_extents[2] * ob->half_extents[2];
+
+		vreal4 inv_inertia = { 0, 0, 0, 0 };
+		inv_inertia.x = 1.0 / ((1.0 / 3.0) * mass * (ey2 + ez2));
+		inv_inertia.y = 1.0 / ((1.0 / 3.0) * mass * (ex2 + ez2));
+		inv_inertia.z = 1.0 / ((1.0 / 3.0) * mass * (ex2 + ey2));
+
+		xpc->inv_inertias[body_id] = inv_inertia;
+	}
+#endif
+
+	xpc->body_shape_ids[body_id] = INVALID_ID;
 
 	return body_id;
 }
@@ -261,28 +319,24 @@ void XPDestroyBody(XPContext* xpc, id body_id)
 
 id XPCreateConvexHull(XPContext* xpc, const real* vertex_positions, u32 vertex_count)
 {
-	// copy vertex data into the persistent convex hull vertex pool
-	const usize verts_bytes = sizeof(real) * vertex_count * 3;
-	real* dest = (real*)xpc->convex_hulls_verts.PushBytes(verts_bytes);
-	if (!dest)
-		return INVALID_ID;
-
-	// copy vertex data
-	for (u32 i = 0; i < vertex_count * 3; ++i)
-		dest[i] = vertex_positions[i];
+	const id shape_id = xpc->convex_hulls_count++;
 
 	// create a hull descriptor
-	const id hull_id = xpc->convex_hull_count++;
-	xpc->convex_hulls[hull_id].nverts = vertex_count;
-	xpc->convex_hulls[hull_id].verts = dest;
+	xpc->convex_hulls[shape_id].nverts = vertex_count;
+	xpc->convex_hulls[shape_id].verts = xpc->convex_hulls_verts;
 
-	return hull_id;
+	// copy vertex data into the persistent convex hull vertex pool
+	const usize vertex_positions_count = vertex_count * 3;
+	for (usize i = 0; i < vertex_positions_count; ++i)
+		*xpc->convex_hulls_verts++ = *vertex_positions++;
+
+	return shape_id;
 }
 
 void XPAttachShape(XPContext* xpc, id body_id, id shape_id)
 {
-	if (body_id < xpc->active_body_count)
-		xpc->body_hull_ids[body_id] = shape_id;
+	if (body_id < xpc->bodies_capacity)
+		xpc->body_shape_ids[body_id] = shape_id;
 }
 
 void XPGetBodyPosition(XPContext* xpc, id body_id, real out_position[3])
@@ -297,6 +351,13 @@ void XPSetBodyPosition(XPContext* xpc, id body_id, const real position[3])
 	xpc->positions[body_id].data[0] = position[0];
 	xpc->positions[body_id].data[1] = position[1];
 	xpc->positions[body_id].data[2] = position[2];
+}
+
+void XPGetBodyLinearVelocity(XPContext* xpc, id body_id, real out_velocity[3])
+{
+	out_velocity[0] = xpc->linear_velocities[body_id].data[0];
+	out_velocity[1] = xpc->linear_velocities[body_id].data[1];
+	out_velocity[2] = xpc->linear_velocities[body_id].data[2];
 }
 
 void XPGetBodyOrientation(XPContext* xpc, id body_id, real out_orientation[4])

@@ -183,6 +183,11 @@ inline vreal4 qrotate(const qreal q, const vreal4 v)
 	return result;
 }
 
+typedef struct
+{
+	real data[9];
+} tensor; // used for inertia
+
 typedef union
 {
 	real data[12];

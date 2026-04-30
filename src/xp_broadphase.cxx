@@ -7,7 +7,7 @@ constexpr real WORLD_MAX = 1000.0;
 constexpr real WORLD_EXTENT = WORLD_MAX - WORLD_MIN;
 
 // helper function to quantize a floating-point value
-inline u16 quantize_coordinate(real value)
+static inline u16 QuantizeCoord(real value)
 {
 	// clamp value to world bounds
 	if (value < WORLD_MIN) value = WORLD_MIN;
@@ -19,16 +19,16 @@ inline u16 quantize_coordinate(real value)
 }
 
 // comparator for qsort
-inline bool aabb_compare_x(const xp_aabb& a, const xp_aabb& b)
+static inline bool AaBbCompareX(const XPBox& a, const XPBox& b)
 {
 	return a.min[0] < b.min[0];
 }
 
-MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_hull_ids, const XPConvexHull* hulls, LinearAllocator<u8>& transient_arena)
+MemoryRange<XPBroadPair> XPBroadSweepAndPrune(u32 active_body_count, const vreal4* body_positions, const qreal* body_orientations, const id* body_shape_ids, const XPConvexHull* hulls, LinearAllocator<u8>& transient_arena)
 {
 	// we need to allocate space for the aabbs in the transient arena
-	const usize aabb_arena_size = sizeof(xp_aabb) * active_body_count;
-	xp_aabb* aabbs = (xp_aabb*)transient_arena.PushBytes(aabb_arena_size);
+	const usize aabb_arena_size = sizeof(XPBox) * active_body_count;
+	XPBox* aabbs = (XPBox*)transient_arena.PushBytes(aabb_arena_size);
 
 	if (!aabbs)
 	{
@@ -40,7 +40,7 @@ MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_co
 	for (u32 i = 0; i < active_body_count; ++i)
 	{
 		const vreal4& pos = body_positions[i];
-		const id hull_id = body_hull_ids[i];
+		const id hull_id = body_shape_ids[i];
 
 		if (hull_id != INVALID_ID)
 		{
@@ -66,43 +66,43 @@ MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_co
 				if (rotated.z > aabb_max[2]) aabb_max[2] = rotated.z;
 			}
 
-			aabbs[i].min[0] = quantize_coordinate(pos.data[0] + aabb_min[0]);
-			aabbs[i].min[1] = quantize_coordinate(pos.data[1] + aabb_min[1]);
-			aabbs[i].min[2] = quantize_coordinate(pos.data[2] + aabb_min[2]);
-			aabbs[i].max[0] = quantize_coordinate(pos.data[0] + aabb_max[0]);
-			aabbs[i].max[1] = quantize_coordinate(pos.data[1] + aabb_max[1]);
-			aabbs[i].max[2] = quantize_coordinate(pos.data[2] + aabb_max[2]);
+			aabbs[i].min[0] = QuantizeCoord(pos.data[0] + aabb_min[0]);
+			aabbs[i].min[1] = QuantizeCoord(pos.data[1] + aabb_min[1]);
+			aabbs[i].min[2] = QuantizeCoord(pos.data[2] + aabb_min[2]);
+			aabbs[i].max[0] = QuantizeCoord(pos.data[0] + aabb_max[0]);
+			aabbs[i].max[1] = QuantizeCoord(pos.data[1] + aabb_max[1]);
+			aabbs[i].max[2] = QuantizeCoord(pos.data[2] + aabb_max[2]);
 		}
 		else
 		{
 			// no hull attached, use a unit-sized fallback
-			aabbs[i].min[0] = quantize_coordinate(pos.data[0] - 0.5);
-			aabbs[i].min[1] = quantize_coordinate(pos.data[1] - 0.5);
-			aabbs[i].min[2] = quantize_coordinate(pos.data[2] - 0.5);
-			aabbs[i].max[0] = quantize_coordinate(pos.data[0] + 0.5);
-			aabbs[i].max[1] = quantize_coordinate(pos.data[1] + 0.5);
-			aabbs[i].max[2] = quantize_coordinate(pos.data[2] + 0.5);
+			aabbs[i].min[0] = QuantizeCoord(pos.data[0] - 0.5);
+			aabbs[i].min[1] = QuantizeCoord(pos.data[1] - 0.5);
+			aabbs[i].min[2] = QuantizeCoord(pos.data[2] - 0.5);
+			aabbs[i].max[0] = QuantizeCoord(pos.data[0] + 0.5);
+			aabbs[i].max[1] = QuantizeCoord(pos.data[1] + 0.5);
+			aabbs[i].max[2] = QuantizeCoord(pos.data[2] + 0.5);
 		}
 
 		aabbs[i].body_id = i;
 	}
 
 	// sort aabbs along the x axis
-	// todo: investigate better performing sorting algorithms
-	std::sort(aabbs, aabbs + active_body_count, aabb_compare_x);
+	// todo: investigate better performing sorting algorithms (like insertion sort if list is almost sorted)
+	std::sort(aabbs, aabbs + active_body_count, AaBbCompareX);
 
 	// now we need to go through the sorted aabbs and find overlaps
 	// we will put them as we find them in the transient arena (so we don't know the initial size)
-	xp_broadphase_pair* pairs = (xp_broadphase_pair*)(transient_arena.memory + transient_arena.size);
+	XPBroadPair* pairs = (XPBroadPair*)(transient_arena.memory + transient_arena.size);
 	u32 npairs = 0;
 
 	for (u32 i = 0; i < active_body_count; ++i)
 	{
-		const xp_aabb& a = aabbs[i];
+		const XPBox& a = aabbs[i];
 
 		for (u32 j = i + 1; j < active_body_count; ++j)
 		{
-			const xp_aabb& b = aabbs[j];
+			const XPBox& b = aabbs[j];
 
 			// if b's minimum x is strictly greater than a's maximum x, it means that
 			// no further bodies can overlap with a along the x axis
@@ -117,7 +117,7 @@ MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_co
 			if (overlap_y && overlap_z)
 			{
 				// push a new pair to the transient arena
-				xp_broadphase_pair* new_pair = (xp_broadphase_pair*)transient_arena.PushBytes(sizeof(xp_broadphase_pair));
+				XPBroadPair* new_pair = (XPBroadPair*)transient_arena.PushBytes(sizeof(XPBroadPair));
 				if (new_pair)
 				{
 					new_pair->body_id_a = a.body_id;
@@ -128,6 +128,6 @@ MemoryRange<xp_broadphase_pair> xp_broadphase_sweep_and_prune(u32 active_body_co
 		}
 	}
 
-	xp_broadphase_pair* pairs_end = pairs + npairs;
+	XPBroadPair* pairs_end = pairs + npairs;
 	return { pairs, pairs_end };
 }

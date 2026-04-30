@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void __stdcall ReportError(const char* str)
+{
+	fputs(str, stderr);
+}
+
 int main()
 {
 	const usize persistent_size = XPGetPersistentMemoryRequirements(1024, 128);
@@ -13,10 +18,12 @@ int main()
 	xmp.persistent_size = persistent_size;
 	xmp.transient_memory = mem + persistent_size;
 	xmp.transient_size = transient_size;
+	XPReporter reporter;
+	reporter.error_report_func = ReportError;
 
 	int result = 0;
 
-	if (XPContext* xpc = XPInit(&xmp, 64, 128))
+	if (XPContext* xpc = XPInit(&xmp, &reporter, 64, 128))
 	{
 		const real cube_vertices[] = {
 			-0.5, -0.5, -0.5,
@@ -41,29 +48,32 @@ int main()
 		};
 
 		id cube_shape = XPCreateConvexHull(xpc, cube_vertices, 8);
-		id floor_shape = XPCreateConvexHull(xpc, floor_vertices, 8);
+//		id floor_shape = XPCreateConvexHull(xpc, floor_vertices, 8);
 
 		id floor_body = XPCreateFixedBody(xpc);
-		XPAttachShape(xpc, floor_body, floor_shape);
+		XPAttachShape(xpc, floor_body, cube_shape);
 		const real floor_pos[3] = {0.0, 0.0, 0.0};
 		XPSetBodyPosition(xpc, floor_body, floor_pos);
 
 		id cube_body = XPCreateDynamicBody(xpc, 10.0);
 		XPAttachShape(xpc, cube_body, cube_shape);
-		const real cube_pos[3] = {0.0, 0.0, 3.0};
+		const real cube_pos[3] = {0.0, 0.0, 5.0};
 		XPSetBodyPosition(xpc, cube_body, cube_pos);
 		printf("Cube height:\n3.0\n");
 
 //		const real gravity[3] = { 0.0, 0.0, -9.81 };
 //		XPSetGravity(xpc, gravity);
 
-		for (int i = 0; i < 120; ++i)
+		for (int i = 0; i < 60; ++i)
 		{
-			XPStep(xpc, 1.0 / 60.0);
+			XPStep(xpc, 1.0 / 30.0);
+//			_sleep(33);
 
 			real body_position[3];
 			XPGetBodyPosition(xpc, cube_body, body_position);
-			printf("%.3f\n", body_position[2]);
+			real body_linear_velocity[3];
+			XPGetBodyLinearVelocity(xpc, cube_body, body_linear_velocity);
+			printf("height=%.3f vel=%.3f\n", body_position[2], body_linear_velocity[2]);
 		}
 #if 0
 		if (final_pos[2] < -0.1) // we allow slight penetration due to PGS solver tolerance, but it should not be very negative

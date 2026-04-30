@@ -7,6 +7,11 @@ struct XPConvexHull
 	real* verts; // interleaved xyz positions
 };
 
+struct OrientedBox
+{
+	real half_extents[3];
+};
+
 template <typename T>
 struct LinearAllocator
 {
@@ -30,6 +35,9 @@ struct LinearAllocator
 
 	void Reset() { size = 0; }
 
+//	bool ContainsAddress(void* address) const { return (address > memory) && (address < (memory + capacity)); }
+
+	// iterators
 	T& operator[](usize i) { return memory[i]; }
 	const T& operator[](usize i) const { return memory[i]; }
 };
@@ -37,13 +45,13 @@ struct LinearAllocator
 template <typename T>
 struct MemoryRange
 {
-	T* begin;
-	T* end;
+	T* head;
+	T* tail;
 
-	usize GetSize() const { return end - begin; }
-	usize GetCount() const { return (end - begin) / sizeof(T); }
+	usize GetSize() const { return (u8*)tail - (u8*)head; }
+	usize GetCount() const { return tail - head; }
 
 	// iterators
-	T& operator[](usize i) { return begin[i]; }
-	const T& operator[](usize i) const { return begin[i]; }
+	T& operator[](usize i) { return head[i]; }
+	const T& operator[](usize i) const { return head[i]; }
 };

@@ -6,14 +6,14 @@
 #include "xp_solver.hxx"
 #include "xp_math_operators.hxx"
 
-void xp_solve_contacts(
+void XPSolveContacts(
 	u32 num_manifolds,
-	xp_contact_manifold* manifolds,
+	XPContactManifold* manifolds,
 	vreal4* positions,
 	vreal4* linear_velocities,
 	vreal4* angular_velocities,
 	real* inv_masses,
-	real* inv_inertias,
+	vreal4* inv_inertias,
 	second dt
 )
 {
@@ -27,7 +27,7 @@ void xp_solve_contacts(
 		// todo: can we parallelize this?
 		for (u32 i = 0; i < num_manifolds; ++i)
 		{
-			xp_contact_manifold& c = manifolds[i];
+			XPContactManifold& c = manifolds[i];
 
 			// skip contacts where both bodies are immovable (avoids division by zero)
 			if (inv_masses[c.body_a] == 0.0 && inv_masses[c.body_b] == 0.0)
@@ -43,8 +43,8 @@ void xp_solve_contacts(
 			vreal4& wB = angular_velocities[c.body_b];
 			const real inv_mass_a = inv_masses[c.body_a];
 			const real inv_mass_b = inv_masses[c.body_b];
-			const real inv_inertia_a = inv_inertias[c.body_a];
-			const real inv_inertia_b = inv_inertias[c.body_b];
+			const vreal4 inv_inertia_a = inv_inertias[c.body_a];
+			const vreal4 inv_inertia_b = inv_inertias[c.body_b];
 
 			// calculate vectors from center of mass to contact point
 			const vreal4 rA = p - posA;
@@ -62,8 +62,8 @@ void xp_solve_contacts(
 			const vreal4 rA_cross_n = vcross(rA, n);
 			const vreal4 rB_cross_n = vcross(rB, n);
 			
-			const real termA = inv_mass_a + vdot(vcross(rA_cross_n, rA), n) * inv_inertia_a;
-			const real termB = inv_mass_b + vdot(vcross(rB_cross_n, rB), n) * inv_inertia_b;
+			const real termA = inv_mass_a + vdot(vcross(rA_cross_n, rA), n) * inv_inertia_a.x; // HACK
+			const real termB = inv_mass_b + vdot(vcross(rB_cross_n, rB), n) * inv_inertia_b.x; // HACK
 			const real m_eff = 1.0 / (termA + termB);
 
 			// apply some baumgarte stabilizationw which adds some velocity bias to push bodies
@@ -84,9 +84,9 @@ void xp_solve_contacts(
 			const vreal4 impulse_vector = n * delta_lambda;
 
 			vA += impulse_vector * inv_mass_a;
-			wA += vcross(rA, impulse_vector) * inv_inertia_a;
+			wA += vcross(rA, impulse_vector) * inv_inertia_a.x; // HACK
 			vB -= impulse_vector * inv_mass_b;
-			wB -= vcross(rB, impulse_vector) * inv_inertia_b;
+			wB -= vcross(rB, impulse_vector) * inv_inertia_b.x; // HACK
 		}
 	}
 }

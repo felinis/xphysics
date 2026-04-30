@@ -2,7 +2,7 @@
 #include "xp_internal.hxx"
 #include "xp_math.hxx"
 
-struct xp_contact_manifold
+struct XPContactManifold
 {
 	id body_a, body_b;
 	real penetration_depth;
@@ -11,13 +11,13 @@ struct xp_contact_manifold
 	vreal4 normal; // from b to a
 };
 
-void xp_solve_contacts(
+void XPSolveContacts(
 	u32 num_manifolds,
-	xp_contact_manifold* manifolds,
+	XPContactManifold* manifolds,
 	vreal4* positions,
 	vreal4* linear_velocities,
 	vreal4* angular_velocities,
 	real* inv_masses,
-	real* inv_inertias,
+	vreal4* inv_inertias,
 	second dt
 );
