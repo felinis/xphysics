@@ -1,6 +1,9 @@
 # xphysics
 _xphysics_ is an experimental rigid body physics library for use in scientific simulations and games.
 
+## Cubes Demo
+[0001-0250.webm](https://github.com/user-attachments/assets/4a84e947-2feb-4987-b9a0-13e62ce94046)
+
 The goal of this project is to understand how data-oriented program design principles can be applied to a project where multiple data processing in bulk is crucial. I chose to use C++ for this project as a sort of middle ground between C and other high-level languages.
 
 ## Project status
