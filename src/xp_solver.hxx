@@ -16,7 +16,7 @@ void XPSolveContacts(
 	XPContactManifold* manifolds,
 	vreal4* positions,
 	vreal4* linear_velocities,
-	vreal4* angular_velocities,
+	qreal* angular_velocities,
 	real* inv_masses,
 	vreal4* inv_inertias,
 	second dt

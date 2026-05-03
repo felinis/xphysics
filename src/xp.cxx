@@ -10,6 +10,9 @@
 #include "xp_math_operators.hxx"
 #include "xp_narrowphase.hxx"
 #include "xp_solver.hxx"
+#if XP_DEBUG_BUILD
+#include <stdio.h> // todo: implement platform-agnostic logging
+#endif
 
 struct XPContext
 {
@@ -162,6 +165,11 @@ static void XPIntegrate(XPContext* xpc, second dt)
 		const vreal4 pos_step = lin_vel * dt;
 		xpc->positions[i] += pos_step;
 
+#if XP_DEBUG_BUILD
+		printf("[XPIntegrate] body=%u pos=(%.3f,%.3f,%.3f) vel=(%.3f,%.3f,%.3f)\n",
+			i, xpc->positions[i].x, xpc->positions[i].y, xpc->positions[i].z,
+			lin_vel.x, lin_vel.y, lin_vel.z);
+#endif
 		xpc->linear_velocities[i] = lin_vel;
 
 		const qreal q_ang_vel = xpc->angular_velocities[i];
@@ -202,21 +210,28 @@ void XPStep(XPContext* xpc, second dt)
 		const XPConvexHull& hull_a = xpc->convex_hulls[hull_id_a];
 		const XPConvexHull& hull_b = xpc->convex_hulls[hull_id_b];
 
-		xp_simplex simplex;
-		if (xp_gjk_intersect(hull_a, xpc->positions[id_a], xpc->orientations[id_a], hull_b, xpc->positions[id_b], xpc->orientations[id_b], simplex))
+		XPSimplex simplex;
+		if (XPGjkIntersect(hull_a, xpc->positions[id_a], xpc->orientations[id_a], hull_b, xpc->positions[id_b], xpc->orientations[id_b], simplex))
 		{
 			vreal4 normal;
 			real penetration_depth;
-			if (xp_epa_expand(hull_a, xpc->positions[id_a], xpc->orientations[id_a], hull_b, xpc->positions[id_b], xpc->orientations[id_b], simplex, normal, penetration_depth))
+			if (XPEpaExpand(hull_a, xpc->positions[id_a], xpc->orientations[id_a], hull_b, xpc->positions[id_b], xpc->orientations[id_b], simplex, normal, penetration_depth))
 			{
 				XPContactManifold& m = manifolds[nmanifolds++];
 				m.body_a = id_a;
 				m.body_b = id_b;
-				m.normal = normal; // we need to negate the normal since epa returns outward normal of minkowski(a - b) but the solver expects normal from b to a
+				m.normal = -normal; // we need to negate the normal since epa returns outward normal of minkowski(a - b) but the solver expects normal from b to a
 				m.penetration_depth = penetration_depth;
 				// approximate contact point on body B's surface along the collision normal
 				m.pos = xpc->positions[id_b] - m.normal * (penetration_depth * 0.5);
 				m.accumulated_impulse = 0.0;
+#if XP_DEBUG_BUILD
+				printf("[XPContactManifold] bodyA=%llu bodyB=%llu normal=(%.3f,%.3f,%.3f) depth=%.4f pos=(%.3f,%.3f,%.3f)\n",
+					id_a, id_b,
+					m.normal.x, m.normal.y, m.normal.z,
+					m.penetration_depth,
+					m.pos.x, m.pos.y, m.pos.z);
+#endif
 			}
 		}
 	}
@@ -229,7 +244,7 @@ void XPStep(XPContext* xpc, second dt)
 			manifolds,
 			xpc->positions,
 			xpc->linear_velocities,
-			(vreal4*)xpc->angular_velocities, // cast qreal* to vreal4* as they have the same layout
+			xpc->angular_velocities,
 			xpc->inv_masses,
 			xpc->inv_inertias,
 			dt

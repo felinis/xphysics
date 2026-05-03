@@ -5,13 +5,16 @@
 
 #include "xp_solver.hxx"
 #include "xp_math_operators.hxx"
+#if XP_DEBUG_BUILD
+#include <stdio.h>
+#endif
 
 void XPSolveContacts(
 	u32 num_manifolds,
 	XPContactManifold* manifolds,
 	vreal4* positions,
 	vreal4* linear_velocities,
-	vreal4* angular_velocities,
+	qreal* angular_velocities,
 	real* inv_masses,
 	vreal4* inv_inertias,
 	second dt
@@ -39,8 +42,9 @@ void XPSolveContacts(
 			const vreal4 posB = positions[c.body_b];
 			vreal4& vA = linear_velocities[c.body_a];
 			vreal4& vB = linear_velocities[c.body_b];
-			vreal4& wA = angular_velocities[c.body_a];
-			vreal4& wB = angular_velocities[c.body_b];
+			// we can totally cast one to another as memory layout is identical
+			vreal4& wA = reinterpret_cast<vreal4&>(angular_velocities[c.body_a]);
+			vreal4& wB = reinterpret_cast<vreal4&>(angular_velocities[c.body_b]);
 			const real inv_mass_a = inv_masses[c.body_a];
 			const real inv_mass_b = inv_masses[c.body_b];
 			const vreal4 inv_inertia_a = inv_inertias[c.body_a];
@@ -61,7 +65,7 @@ void XPSolveContacts(
 			// effective masses
 			const vreal4 rA_cross_n = vcross(rA, n);
 			const vreal4 rB_cross_n = vcross(rB, n);
-			
+
 			const real termA = inv_mass_a + vdot(vcross(rA_cross_n, rA), n) * inv_inertia_a.x; // HACK
 			const real termB = inv_mass_b + vdot(vcross(rB_cross_n, rB), n) * inv_inertia_b.x; // HACK
 			const real m_eff = 1.0 / (termA + termB);
@@ -82,6 +86,14 @@ void XPSolveContacts(
 
 			// now we want to apply the impulse vector to the bodies
 			const vreal4 impulse_vector = n * delta_lambda;
+
+#if XP_DEBUG_BUILD
+			if (it == 0)
+			{
+				printf("[Solver] contact %u: v_rel_n=%.4f bias=%.4f lambda=%.4f delta_lambda=%.4f impulse_z=%.4f\n",
+					i, v_rel_n, bias, lambda, delta_lambda, impulse_vector.z);
+			}
+#endif
 
 			vA += impulse_vector * inv_mass_a;
 			wA += vcross(rA, impulse_vector) * inv_inertia_a.x; // HACK

@@ -3,7 +3,7 @@
 #include "xp_math.hxx"
 
 // defines a gjk shape
-struct xp_simplex
+struct XPSimplex
 {
 	vreal4 points[4]; // these can form a point, line, triangle or tetrahedron
 	u8 count;
@@ -19,15 +19,15 @@ struct xp_simplex
 	}
 };
 
-bool xp_gjk_intersect(
+bool XPGjkIntersect(
 	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
 	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
-	xp_simplex& simplex);
+	XPSimplex& simplex);
 
-bool xp_epa_expand(
+bool XPEpaExpand(
 	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
 	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
-	xp_simplex& simplex,
+	XPSimplex& simplex,
 	vreal4& normal,
 	real& penetration_depth
 );

@@ -5,8 +5,11 @@
 
 #include "xp_narrowphase.hxx"
 #include "xp_math_operators.hxx"
+#if XP_DEBUG_BUILD
+#include <stdio.h>
+#endif
 
-// support mapping function: finds the furthest vertex of the convex hull in a given direction 
+// support mapping function: finds the furthest vertex of the convex hull in a given direction
 inline vreal4 xp_get_convex_hull_support(const XPConvexHull& hull, const vreal4& dir)
 {
 	vreal4 best_vert = { hull.verts[0], hull.verts[1], hull.verts[2], 0.0 };
@@ -48,7 +51,7 @@ inline vreal4 xp_get_minkowski_support(
 	return support_a - support_b;
 }
 
-bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
+bool xp_do_simplex(XPSimplex& simplex, vreal4& dir)
 {
 	const vreal4 a = simplex.points[0];
 
@@ -207,10 +210,10 @@ bool xp_do_simplex(xp_simplex& simplex, vreal4& dir)
 	return false;
 }
 
-bool xp_gjk_intersect(
+bool XPGjkIntersect(
 	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
 	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
-	xp_simplex& simplex)
+	XPSimplex& simplex)
 {
 	vreal4 search_direction = { 1.0, 0.0, 0.0, 0.0 }; // todo: cache and get the one from previous frame so we have O(1)
 
@@ -234,14 +237,19 @@ bool xp_gjk_intersect(
 		simplex.push(point);
 
 		if (xp_do_simplex(simplex, search_direction))
+		{
+#if XP_DEBUG_BUILD
+			printf("[GJK] Collision detected, simplex count=%d\n", simplex.count);
+#endif
 			return true; // simplex encloses the origin, we have interpenetration
+		}
 	}
 
 	return false;
 }
 
 // represents a single triangular face on the epa polytope
-struct xp_epa_face
+struct XPEpaFace
 {
 	vreal4 a, b, c;
 	vreal4 normal;
@@ -249,7 +257,7 @@ struct xp_epa_face
 };
 
 // computes a face's normal and distance from the origin
-inline void xp_compute_face_info(xp_epa_face& face)
+inline void xp_compute_face_info(XPEpaFace& face)
 {
 	const vreal4 ab = face.b - face.a;
 	const vreal4 ac = face.c - face.a;
@@ -284,15 +292,15 @@ inline void xp_add_epa_edge(xp_epa_edge* edges, u32& nedges, const vreal4& a, co
 			return;
 		}
 	}
-	
+
 	// otherwise it's a new edge, add it to the silhouette
 	edges[nedges++] = { a, b };
 }
 
-bool xp_epa_expand(
+bool XPEpaExpand(
 	const XPConvexHull& hull_a, const vreal4& pos_a, const qreal& orient_a,
 	const XPConvexHull& hull_b, const vreal4& pos_b, const qreal& orient_b,
-	xp_simplex& simplex,
+	XPSimplex& simplex,
 	vreal4& normal,
 	real& penetration_depth
 )
@@ -305,7 +313,7 @@ bool xp_epa_expand(
 
 	// allocate a flat array for out polytope faces from the transient arena
 	const u32 MAX_FACES = 64;
-	xp_epa_face faces[MAX_FACES];
+	XPEpaFace faces[MAX_FACES];
 	u32 nfaces = 0;
 
 	// note: winding order must ensure that normals are pointing out
@@ -315,9 +323,14 @@ bool xp_epa_expand(
 	xp_compute_face_info(faces[1]);
 	faces[2] = { a, d, b };
 	xp_compute_face_info(faces[2]);
-	faces[3] = { b, c, d };
+	faces[3] = { b, d, c };
 	xp_compute_face_info(faces[3]);
 	nfaces = 4;
+
+#if XP_DEBUG_BUILD
+	printf("[XPEpaExpand] Initial faces distances: %.4f %.4f %.4f %.4f\n",
+		faces[0].distance, faces[1].distance, faces[2].distance, faces[3].distance);
+#endif
 
 	// main epa iteration loop
 	const u32 MAX_EPA_ITERATIONS = 32; // we need this to prevent infinite loops
@@ -335,7 +348,7 @@ bool xp_epa_expand(
 			}
 		}
 
-		xp_epa_face closest_face = faces[min_face_index];
+		XPEpaFace closest_face = faces[min_face_index];
 
 		// find a new point in the direction of the normal
 		const vreal4 support_point = xp_get_minkowski_support(hull_a, pos_a, orient_a, hull_b, pos_b, orient_b, closest_face.normal);
@@ -348,6 +361,10 @@ bool xp_epa_expand(
 		{
 			normal = closest_face.normal;
 			penetration_depth = support_dist;
+#if XP_DEBUG_BUILD
+			printf("[XPEpaExpand] Converged: normal=(%.3f,%.3f,%.3f) depth=%.4f iter=%u\n",
+				normal.x, normal.y, normal.z, penetration_depth, i);
+#endif
 			return true; // collision detected
 		}
 
@@ -394,5 +411,9 @@ bool xp_epa_expand(
 	normal = faces[0].normal;
 	penetration_depth = faces[0].distance;
 
+#if XP_DEBUG_BUILD
+	printf("[EPA] Fallback: normal=(%.3f,%.3f,%.3f) depth=%.4f\n",
+		normal.x, normal.y, normal.z, penetration_depth);
+#endif
 	return true; // collision detected
 }

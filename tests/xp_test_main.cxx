@@ -57,26 +57,25 @@ int main()
 
 		id cube_body = XPCreateDynamicBody(xpc, 10.0);
 		XPAttachShape(xpc, cube_body, cube_shape);
-		const real cube_pos[3] = {0.0, 0.0, 5.0};
+		const real cube_pos[3] = {0.0, 0.0, 2.0};
 		XPSetBodyPosition(xpc, cube_body, cube_pos);
-		printf("Cube height:\n3.0\n");
 
-//		const real gravity[3] = { 0.0, 0.0, -9.81 };
-//		XPSetGravity(xpc, gravity);
+		const real gravity[3] = { 0.0, 0.0, -9.81 };
+		XPSetGravity(xpc, gravity);
 
+		real body_position[3];
 		for (int i = 0; i < 60; ++i)
 		{
 			XPStep(xpc, 1.0 / 30.0);
 //			_sleep(33);
 
-			real body_position[3];
 			XPGetBodyPosition(xpc, cube_body, body_position);
 			real body_linear_velocity[3];
 			XPGetBodyLinearVelocity(xpc, cube_body, body_linear_velocity);
 			printf("height=%.3f vel=%.3f\n", body_position[2], body_linear_velocity[2]);
 		}
-#if 0
-		if (final_pos[2] < -0.1) // we allow slight penetration due to PGS solver tolerance, but it should not be very negative
+#if 1
+		if (body_position[2] < -0.1) // we allow slight penetration due to PGS solver tolerance, but it should not be very negative
 		{
 			printf("TEST FAILED: cube fell through the floor.\n");
 			result = 1;
