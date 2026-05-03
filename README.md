@@ -18,9 +18,13 @@ Work-in-progress, __not production ready__.
 - Implement island generation
 
 ## Unit tests
-Currently only math unit tests are present.
-### PowerShell
+There are currently 2 unit tests:
+- **Math test** to check the validity of all math calculations.
 ```ps
 .\build\Debug\xp_test_math.exe ; echo $LastExitCode
 ```
 If this command returns 0, it means all tests passed. Otherwise, it returns the index of the test that failed.
+- **Main test** which spawns 2 cubes: one is dynamic, it falls on a fixed one and stays on it.
+```ps
+.\build\Debug\xp_test_main.exe
+```
